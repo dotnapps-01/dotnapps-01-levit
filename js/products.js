@@ -187,4 +187,6 @@ export const PRODUCTS = [
 PRODUCTS.forEach((p) => { p.real = true; });
 
 export const inr = (n) => '₹' + n.toLocaleString('en-IN');
+/** Small copy of a catalogue photo (img/p/x.webp -> img/p/s/x.webp) for grids, the bag and search. */
+export const thumb = (src) => (/^img\/(?!.*\/s\/)/.test(src) ? src.replace(/([^/]+)$/, 's/$1') : src);
 export const byId = (id) => PRODUCTS.find((p) => p.id === id);

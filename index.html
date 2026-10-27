@@ -13,6 +13,15 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/playfair-display-latin-900-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/jost-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="modulepreload" href="js/app.js">
+<link rel="modulepreload" href="js/products.js">
+<link rel="modulepreload" href="js/garments.js">
+<link rel="modulepreload" href="js/offer.js">
+<link rel="modulepreload" href="js/heroes/index.js">
+<link rel="modulepreload" href="js/heroes/reel.js">
+<link rel="modulepreload" href="js/heroes/util.js">
+<link rel="preload" as="image" href="img/p/ruby-ruffle-dress.webp" fetchpriority="high">
+<script>window.__cat=fetch('/api/catalog').then(function(r){return r.ok&&(r.headers.get('content-type')||'').indexOf('json')>-1?r.json():null}).catch(function(){return null});</script>
 <link rel="stylesheet" href="css/levit.css">
 <link rel="stylesheet" href="css/heroes.css">
 <script>document.documentElement.classList.add('js');try{if(sessionStorage.getItem('levit.seen'))document.documentElement.classList.add('skip-pre');}catch(e){}</script>

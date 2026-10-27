@@ -1,4 +1,4 @@
-import { PRODUCTS, CATEGORIES, SIZES, inr, byId } from './products.js';
+import { PRODUCTS, CATEGORIES, SIZES, inr, byId, thumb } from './products.js';
 import { garmentSVG, GARMENT_DEFS } from './garments.js';
 import { initHeroes } from './heroes/index.js';
 import { initOffer } from './offer.js';
@@ -129,7 +129,7 @@ function cardHTML(p, i) {
   return `<article class="card" data-id="${p.id}" data-reveal style="--i:${i % 8}">
     <div class="card__stage">
       <button class="card__media" style="--bg:${p.bg}" data-quick="${p.id}" aria-label="${p.name}, ${inr(p.price)}. Open details">
-        <img class="card__photo" src="${p.photo}" alt="" loading="lazy" decoding="async">
+        <img class="card__photo" src="${thumb(p.photo)}" alt="" width="560" height="754" loading="lazy" decoding="async">
       </button>
       ${tag}
       <button class="card__wish" aria-pressed="${wish.has(p.id)}" aria-label="Save ${p.name} to wishlist" data-wish="${p.id}">${heart}</button>
@@ -282,7 +282,7 @@ function updateCounts() {
   tb.hidden = !n; tb.textContent = n; tw.hidden = !wish.size; tw.textContent = wish.size;
 }
 
-function lineArt(p) { return `<span class="line__art" style="--bg:${p.bg}"><img src="${p.photo}" alt=""></span>`; }
+function lineArt(p) { return `<span class="line__art" style="--bg:${p.bg}"><img src="${thumb(p.photo)}" alt="" loading="lazy" decoding="async"></span>`; }
 
 function renderBag() {
   const sub = subtotal(), empty = !bag.length;
@@ -543,7 +543,7 @@ if (fine && !reduced) {
       shown = a.dataset.cat;
       const p = PRODUCTS.find((x) => x.cat === shown);
       prev.style.background = p.bg;
-      prev.innerHTML = `<img src="${p.photo}" alt="">`;
+      prev.innerHTML = `<img src="${thumb(p.photo)}" alt="">`;
       prev.classList.remove('is-on'); void prev.offsetWidth;
     }
     prev.classList.add('is-on');
@@ -555,38 +555,41 @@ if (fine && !reduced) {
 /* ───────────────────────── boot ───────────────────────── */
 /* the live catalogue (api/catalog): prices, stock, hidden pieces and fees come from the dashboard.
    If the API is not there (a static preview), the built-in catalogue is used as it is. */
-async function syncCatalog() {
-  try {
-    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 1500);
-    const r = await fetch('/api/catalog', { signal: ctl.signal }); clearTimeout(t);
-    if (!r.ok || !(r.headers.get('content-type') || '').includes('json')) return false;
-    const d = await r.json();
-    if (!Array.isArray(d.products) || !d.products.length) return false;
-    PRODUCTS.splice(0, PRODUCTS.length, ...d.products.map((p) => ({ ...p, real: true })));
-    CATEGORIES.splice(0, CATEGORIES.length, ...d.categories);
-    const c = d.settings; FREE_SHIP = c.freeShip; SHIP = c.shipFee; COD = c.codFee; cfg = c; live = true;
-    bag = bag.filter((l) => byId(l.id)); wish = new Set([...wish].filter(byId));
-    if (offer) { offer = c.offer.active ? { code: c.offer.code, pct: c.offer.pct } : null; store.set('levit.offer', offer); }
-    return true;
-  } catch { return false; }
-}
-function refreshShop() { renderIndex(); renderChips(); renderGrid(); renderBag(); updateCounts(); }
-await syncCatalog();
-if (live) {
+const catalogFetch = () => {
+  const early = window.__cat; window.__cat = null;                       // the page starts this request from <head>, in parallel with the scripts
+  const req = early || fetch('/api/catalog').then((r) => (r.ok && (r.headers.get('content-type') || '').includes('json') ? r.json() : null));
+  return Promise.race([req.catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
+};
+function applyCatalog(d) {
+  if (!d || !Array.isArray(d.products) || !d.products.length) return false;
+  PRODUCTS.splice(0, PRODUCTS.length, ...d.products.map((p) => ({ ...p, real: true })));
+  CATEGORIES.splice(0, CATEGORIES.length, ...d.categories);
+  const c = d.settings; FREE_SHIP = c.freeShip; SHIP = c.shipFee; COD = c.codFee; cfg = c; live = true;
+  bag = bag.filter((l) => byId(l.id)); wish = new Set([...wish].filter(byId));
+  if (offer) { offer = c.offer.active ? { code: c.offer.code, pct: c.offer.pct } : null; store.set('levit.offer', offer); }
   const cod = $('input[name="pay"][value="cod"] + span small'); if (cod) cod.textContent = `+ ₹${COD} handling`;
   const cd = $('#co-cod-row dd'); if (cd) cd.textContent = '₹' + COD;
   const note = $('.checkout__note'); if (note) note.textContent = 'No payment is taken online yet. We confirm your order by phone or email.';
+  if (filter !== 'all' && filter !== 'saved' && !CATEGORIES.some((x) => x.id === filter)) filter = 'all';
+  return true;
 }
+const syncCatalog = async () => applyCatalog(await catalogFetch());
+function refreshShop() { renderIndex(); renderChips(); renderGrid(); renderBag(); updateCounts(); }
 if (onShopPage) {
   const c = new URLSearchParams(location.search).get('cat');
-  if (c && (c === 'saved' || CATEGORIES.some((x) => x.id === c))) filter = c; else if (c) filter = 'all';
+  if (c && (c === 'saved' || CATEGORIES.some((x) => x.id === c))) filter = c;
 }
+/* paint at once with the built-in catalogue; if the live one is not back within a moment, swap it in when it lands */
+const catalogReq = catalogFetch();
+const quick = await Promise.race([catalogReq, new Promise((r) => setTimeout(() => r('late'), 300))]);
+if (quick !== 'late') applyCatalog(quick);
 refreshShop();
+if (quick === 'late') catalogReq.then((d) => { if (applyCatalog(d)) refreshShop(); });
 $$('[data-reveal]').forEach(observeReveal);
 
 async function reveal() {
   const seen = root.classList.contains('skip-pre') || reduced;      // the intro plays once per visit
-  await Promise.all([Promise.race([document.fonts?.ready, new Promise((r) => setTimeout(r, 1600))]), new Promise((r) => setTimeout(r, seen ? 0 : 1700))]);
+  await Promise.all([Promise.race([document.fonts?.ready, new Promise((r) => setTimeout(r, seen ? 700 : 1100))]), new Promise((r) => setTimeout(r, seen ? 0 : 1150))]);
   try { sessionStorage.setItem('levit.seen', '1'); } catch { /* storage unavailable */ }
   root.classList.add('is-ready'); root.dispatchEvent(new Event('ready'));
 }
@@ -600,5 +603,5 @@ document.addEventListener('levit:offer', (e) => {
   offer = e.detail; if (live) fetch('/api/offer-claim', { method: 'POST', keepalive: true }).catch(() => {}); store.set('levit.offer', offer); renderBag();
   toast(`${offer.code} unlocked: ${offer.pct}% off, applied in your bag`);
 });
-initOffer({ claimed: () => !!offer, ...cfg.offer });
+catalogReq.then(() => initOffer({ claimed: () => !!offer, ...cfg.offer }));
 document.addEventListener('levit:wish', (e) => { if (byId(e.detail) && !wish.has(e.detail)) toggleWish(e.detail); });
