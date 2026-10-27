@@ -508,12 +508,11 @@ body:has(dialog[open]) { overflow: hidden; }
   .foot { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
   .tabbar { position: fixed; z-index: 55; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom)); translate: -50% 0; display: flex; gap: 2px; padding: 5px; border-radius: 99px; background: rgba(255, 250, 242, .66); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6); border: 1px solid rgba(255, 255, 255, .6); box-shadow: 0 12px 32px rgba(40, 25, 10, .2); color: var(--ink); transition: translate .5s var(--ease), background .4s, border-color .4s, box-shadow .4s; }
   .tabbar.is-away { translate: -50% 180%; }
-  .tabbar a, .tabbar button { position: relative; display: flex; align-items: center; justify-content: center; height: 46px; min-width: 46px; padding: 0 12px; border-radius: 99px; color: inherit; opacity: .78; transition: padding .4s var(--ease), background .3s, color .3s, opacity .3s; }
+  .tabbar a, .tabbar button { position: relative; display: flex; align-items: center; justify-content: center; height: 46px; min-width: 46px; padding: 0 12px; border-radius: 99px; color: inherit; opacity: .78; transition: background .3s, color .3s, opacity .3s; }
   .tabbar svg { flex: none; }
-  .tabbar span { max-width: 0; overflow: hidden; opacity: 0; white-space: nowrap; font: 500 .66rem/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; transition: max-width .45s var(--ease), opacity .3s, margin .45s var(--ease); }
-  .tabbar .is-on { opacity: 1; padding: 0 16px 0 14px; background: var(--ink); color: #fff; } .tabbar .is-on span { max-width: 70px; margin-left: 8px; opacity: 1; }
+  .tabbar span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .tabbar .is-on { opacity: 1; background: var(--ink); color: #fff; }
   .tabbar .count { top: 4px; right: 2px; min-width: 16px; height: 16px; font-size: .6rem; line-height: 16px; background: var(--rust); }
-  .tabbar .is-on .count { right: -2px; }
   .over-hero .tabbar { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(18, 14, 11, .58); border-color: rgba(255, 255, 255, .2); box-shadow: 0 12px 32px rgba(0, 0, 0, .35); color: #fff; }
   .over-hero .tabbar .is-on { background: rgba(255, 255, 255, .94); color: var(--ink); }
   .head__r .icon-btn { display: none; }
@@ -563,3 +562,7 @@ input, select, textarea { font-size: max(16px, 1em); }
 @media (prefers-reduced-motion: reduce) { .sizes.shake { animation: none; } }
 .toast:not(:popover-open) { display: none; }
 @media (max-width: 699px) { .card__meta { flex-direction: column; gap: 2px; } .card__name { font-size: .92rem; } .card__price { font-size: .9rem; } }
+
+/* on a phone the page scrolls behind the status bar: extend the header's background up over that strip */
+.head::after { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: env(safe-area-inset-top, 0px); background: inherit; -webkit-backdrop-filter: inherit; backdrop-filter: inherit; pointer-events: none; }
+.head.on-hero::after { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }

@@ -384,9 +384,10 @@ let lastY = scrollY;
 const onScroll = () => {
   head.classList.toggle('is-stuck', scrollY > 8);
   // the header (and dock) sit over the hero photo and change look once you scroll past it
-  const over = scrollY + head.offsetHeight < heroEl.offsetTop + heroEl.offsetHeight - 6;
-  head.classList.toggle('on-hero', over); root.classList.toggle('over-hero', over);
-  const tc = scrollY < 36 ? '#1F2B24' : over ? '#0B0907' : '#FFFDF9';
+  const atTop = scrollY < 24;                                       // header floats clear over the hero only here
+  const heroFills = heroEl.offsetTop + heroEl.offsetHeight - scrollY > innerHeight * 0.55;
+  head.classList.toggle('on-hero', atTop); root.classList.toggle('over-hero', heroFills);
+  const tc = scrollY < 36 ? '#1F2B24' : '#FFFDF9';
   if (tc !== themeNow) { themeNow = tc; themeMeta?.setAttribute('content', tc); }
   // the dock slides away while reading downwards and returns the moment you scroll up
   const dy = scrollY - lastY;
@@ -516,5 +517,6 @@ reveal();
 
 /* hero: the swipe-up reel (js/heroes/) */
 initHeroes();
+dispatchEvent(new Event('scroll'));   // the dock and header state depend on the hero's height
 document.addEventListener('levit:quick', (e) => openQuick(e.detail));
 document.addEventListener('levit:wish', (e) => { if (byId(e.detail) && !wish.has(e.detail)) toggleWish(e.detail); });
