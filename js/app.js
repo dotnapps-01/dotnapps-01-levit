@@ -1,6 +1,7 @@
 import { PRODUCTS, CATEGORIES, SIZES, inr, byId } from './products.js';
 import { garmentSVG, GARMENT_DEFS } from './garments.js';
 import { initHeroes } from './heroes/index.js';
+import { initOffer } from './offer.js';
 
 /* ───────────────────────── helpers ───────────────────────── */
 const $ = (s, r = document) => r.querySelector(s);
@@ -8,6 +9,7 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const root = document.documentElement;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+const onShopPage = document.body.dataset.page === 'shop';
 
 const store = {
   get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
@@ -47,6 +49,7 @@ let view = store.get('levit.view', '2');
 let bag = store.get('levit.bag.v1', []).filter((l) => byId(l.id));
 let wish = new Set(store.get('levit.wish.v1', []).filter(byId));
 let filter = 'all';
+let offer = store.get('levit.offer', null);       // { code, pct } once the welcome card has been scratched
 let sort = 'featured';
 const colorOf = {};              // productId -> selected colour index in the grid
 
@@ -81,9 +84,10 @@ document.addEventListener('click', (e) => {
 
 /* ───────────────────────── index (collections) ───────────────────────── */
 function renderIndex() {
+  if (!$('#index')) return;
   $('#index').innerHTML = CATEGORIES.map((c, i) => {
     const n = PRODUCTS.filter((p) => p.cat === c.id).length;
-    return `<li data-reveal style="--d:${i * 0.06}s"><a href="#shop" data-filter="${c.id}" data-cat="${c.id}">
+    return `<li data-reveal style="--d:${i * 0.06}s"><a href="shop.html?cat=${c.id}" data-filter="${c.id}" data-cat="${c.id}">
       <span class="index__no">0${i + 1}</span>
       <span class="index__name">${c.name}</span>
       <span class="index__meta"><small>${n} pieces</small><span>${c.blurb}</span></span>
@@ -94,6 +98,7 @@ function renderIndex() {
 
 /* ───────────────────────── shop ───────────────────────── */
 function renderChips() {
+  if (!$('#chips')) return;
   const all = [{ id: 'all', name: 'All' }, ...CATEGORIES];
   if (wish.size) all.push({ id: 'saved', name: 'Saved' });
   $('#chips').innerHTML = all.map((c) => {
@@ -134,22 +139,30 @@ function cardHTML(p, i) {
 }
 
 function renderGrid() {
-  const list = visibleProducts();
+  let list = visibleProducts();
   const g = $('#grid');
   g.dataset.view = view;
+  if (g.dataset.limit) list = list.slice(0, innerWidth < 700 ? 4 : +g.dataset.limit);       // the home page shows a short edit
   g.innerHTML = list.length
     ? list.map(cardHTML).join('')
     : `<div class="grid__empty"><p>${filter === 'saved' ? 'Nothing saved yet. Tap the heart on any piece.' : 'Nothing here yet.'}</p><button class="btn btn--ink" type="button" data-chip="all"><span>See everything</span></button></div>`;
-  $('#shop-n').textContent = PRODUCTS.length;
+  const n = $('#shop-n'); if (n) n.textContent = onShopPage && filter !== 'all' ? visibleProducts().length : PRODUCTS.length;
+  const an = $('#shop-all-n'); if (an) an.textContent = PRODUCTS.length;
   const name = filter === 'all' ? '' : filter === 'saved' ? 'Saved' : CATEGORIES.find((c) => c.id === filter)?.name;
-  $('#shop-result').innerHTML = filter === 'all' && sort === 'featured' ? '' : `Showing <b>${list.length}</b> ${list.length === 1 ? 'piece' : 'pieces'}${name ? ` in <b>${name}</b>` : ''}${sort !== 'featured' ? ` · ${$('#sort').selectedOptions[0].textContent.toLowerCase()}` : ''} <button class="link" type="button" data-clear>Clear</button>`;
+  const res = $('#shop-result');
+  if (res) res.innerHTML = filter === 'all' && sort === 'featured' ? '' : `Showing <b>${list.length}</b> ${list.length === 1 ? 'piece' : 'pieces'}${name ? ` in <b>${name}</b>` : ''}${sort !== 'featured' ? ` · ${$('#sort').selectedOptions[0].textContent.toLowerCase()}` : ''} <button class="link" type="button" data-clear>Clear</button>`;
+  const bl = $('#shop-blurb');
+  if (bl) { const c = CATEGORIES.find((x) => x.id === filter); bl.textContent = c ? c.blurb : filter === 'saved' ? 'The pieces you have saved.' : 'Every piece photographed in our boutique. Tap one to see it up close.'; }
+  if (onShopPage) document.title = `${name ? name + ' · ' : ''}Shop · LEVIT Womenswear`;
   $$('#grid [data-reveal]').forEach(observeReveal);
   $$('[data-view]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.view === view));
   renderChips();
 }
 
 function setFilter(f, scroll = false) {
+  if (!onShopPage) { location.href = `shop.html?cat=${f}`; return; }
   filter = f; renderGrid();
+  const u = new URL(location.href); f === 'all' ? u.searchParams.delete('cat') : u.searchParams.set('cat', f); history.replaceState(null, '', u);
   if (scroll) $('#shop').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
 }
 function showSaved() {
@@ -159,13 +172,13 @@ function showSaved() {
 
 document.addEventListener('click', (e) => {
   const c = e.target.closest('[data-chip]'); if (c) { setFilter(c.dataset.chip); return; }
-  if (e.target.closest('[data-clear]')) { sort = 'featured'; $('#sort').value = 'featured'; setFilter('all'); return; }
+  if (e.target.closest('[data-clear]')) { sort = 'featured'; const s = $('#sort'); if (s) s.value = 'featured'; setFilter('all'); return; }
   const v = e.target.closest('[data-view]'); if (v) { view = v.dataset.view; store.set('levit.view', view); renderGrid(); }
 });
-$('#sort').addEventListener('change', (e) => { sort = e.target.value; renderGrid(); });
+$('#sort')?.addEventListener('change', (e) => { sort = e.target.value; renderGrid(); });
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[data-filter]');
-  if (a) setFilter(a.dataset.filter);
+  if (a && onShopPage) { e.preventDefault(); setFilter(a.dataset.filter, true); }
 });
 
 $('#grid').addEventListener('click', (e) => {
@@ -250,6 +263,7 @@ function addToBag(id, size, ci, qty = 1, { open = true } = {}) {
 const lineTotal = (l) => byId(l.id).price * l.qty;
 const subtotal = () => bag.reduce((n, l) => n + lineTotal(l), 0);
 const shipping = (sub) => (sub === 0 || sub >= FREE_SHIP ? 0 : SHIP);
+const discount = (sub) => (offer ? Math.round((sub * offer.pct) / 100) : 0);
 
 function updateCounts() {
   const n = bag.reduce((a, l) => a + l.qty, 0);
@@ -285,7 +299,9 @@ function renderBag() {
   $('#ship-fill').parentElement.style.setProperty('--p', Math.min(1, sub / FREE_SHIP));
   $('#sub').textContent = inr(sub);
   $('#shipcost').textContent = shipping(sub) ? inr(SHIP) : 'Free';
-  $('#grand').textContent = inr(sub + shipping(sub));
+  const dsc = discount(sub), dr = $('#disc-row');
+  dr.hidden = !dsc; if (dsc) { $('#disc').textContent = '−' + inr(dsc); $('#disc-code').textContent = offer.code; }
+  $('#grand').textContent = inr(sub - dsc + shipping(sub));
 }
 $('#lines').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
@@ -308,7 +324,9 @@ function renderCheckoutSummary() {
   $('#co-sub').textContent = inr(sub);
   $('#co-ship').textContent = shipping(sub) ? inr(SHIP) : 'Free';
   $('#co-cod-row').hidden = !cod;
-  $('#co-total').textContent = inr(sub + shipping(sub) + (cod ? COD : 0));
+  const dsc = discount(sub), dr = $('#co-disc-row');
+  dr.hidden = !dsc; if (dsc) { $('#co-disc').textContent = '−' + inr(dsc); $('#co-disc-code').textContent = offer.code; }
+  $('#co-total').textContent = inr(sub - dsc + shipping(sub) + (cod ? COD : 0));
 }
 $('#checkout-btn').addEventListener('click', () => {
   $('#bag').close();
@@ -385,8 +403,8 @@ const onScroll = () => {
   head.classList.toggle('is-stuck', scrollY > 8);
   head.classList.toggle('is-pinned', scrollY >= 36);               // the announce bar has scrolled away: the header is truly pinned
   // the header (and dock) sit over the hero photo and change look once you scroll past it
-  const atTop = scrollY < 24;                                       // header floats clear over the hero only here
-  const heroFills = heroEl.offsetTop + heroEl.offsetHeight - scrollY > innerHeight * 0.55;
+  const atTop = !!heroEl && scrollY < 24;                           // header floats clear over the hero only here
+  const heroFills = !!heroEl && heroEl.offsetTop + heroEl.offsetHeight - scrollY > innerHeight * 0.55;
   head.classList.toggle('on-hero', atTop); root.classList.toggle('over-hero', heroFills);
   const tc = scrollY < 36 ? '#1F2B24' : '#FFFDF9';
   if (tc !== themeNow) { themeNow = tc; themeMeta?.setAttribute('content', tc); }
@@ -399,9 +417,9 @@ const onScroll2 = () => { totop.hidden = scrollY < 1400; };
 addEventListener('scroll', () => { onScroll(); onScroll2(); }, { passive: true }); onScroll(); onScroll2();
 totop.addEventListener('click', () => scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }));
 /* the section in view lights up in the header nav and the tab bar */
-const spy = { top: 'home', shop: 'shop', collections: 'shop', story: '', craft: '', boutique: '', join: '' };
+const spy = onShopPage ? { top: 'shop', shop: 'shop', join: 'shop' } : { top: 'home', shop: 'shop', collections: 'home', story: 'home', craft: 'home', boutique: 'home', join: 'home' };
 const setActive = (id) => {
-  $$('.head__nav a').forEach((a) => a.toggleAttribute('aria-current', a.getAttribute('href') === '#' + id));
+  $$('.head__nav a').forEach((a) => a.toggleAttribute('aria-current', onShopPage ? a.getAttribute('href') === 'shop.html' : a.getAttribute('href') === '#' + id));
   const t = spy[id] ?? ''; $$('#tabbar [data-tab]').forEach((el) => { const on = el.dataset.tab === t; el.classList.toggle('is-on', on); on ? el.setAttribute('aria-current', 'page') : el.removeAttribute('aria-current'); });
 };
 if ('IntersectionObserver' in window) {
@@ -433,7 +451,7 @@ function countUp(el) {
 
 /* footer wordmark letters rise in sequence */
 $$('.foot__word span').forEach((s, i) => s.style.setProperty('--i', i));
-observeReveal($('.foot__word'));
+$('.foot__word') && observeReveal($('.foot__word'));
 
 /* image parallax inside the arches */
 const par = $$('[data-parallax]');
@@ -483,14 +501,15 @@ if (fine && !reduced) {
   });
 
   /* category index: a swinging garment follows the pointer */
-  const prev = $('#index-preview');
+  const prev = $('#index-preview') || document.createElement('div');
   let px = 0, py = 0, qx = 0, qy = 0, shown = null, raf = 0;
   const follow = () => {
     qx += (px - qx) * 0.14; qy += (py - qy) * 0.14;
     prev.style.transform = `translate3d(${qx}px, ${qy}px, 0)`;
     if (prev.classList.contains('is-on') || Math.abs(px - qx) > 0.5) raf = requestAnimationFrame(follow); else raf = 0;
   };
-  $('#index').addEventListener('pointermove', (e) => {
+  const idx = $('#index');
+  if (idx) idx.addEventListener('pointermove', (e) => {
     const a = e.target.closest('a[data-cat]'); if (!a) return;
     px = e.clientX + 36; py = e.clientY - 150;
     if (shown !== a.dataset.cat) {
@@ -503,15 +522,21 @@ if (fine && !reduced) {
     prev.classList.add('is-on');
     if (!raf) raf = requestAnimationFrame(follow);
   });
-  $('#index').addEventListener('pointerleave', () => { prev.classList.remove('is-on'); shown = null; });
+  idx?.addEventListener('pointerleave', () => { prev.classList.remove('is-on'); shown = null; });
 }
 
 /* ───────────────────────── boot ───────────────────────── */
+if (onShopPage) {
+  const c = new URLSearchParams(location.search).get('cat');
+  if (c && (c === 'saved' || CATEGORIES.some((x) => x.id === c))) filter = c;
+}
 renderIndex(); renderChips(); renderGrid(); renderBag(); updateCounts();
 $$('[data-reveal]').forEach(observeReveal);
 
 async function reveal() {
-  await Promise.race([document.fonts?.ready, new Promise((r) => setTimeout(r, 1200))]);
+  const seen = root.classList.contains('skip-pre') || reduced;      // the intro plays once per visit
+  await Promise.all([Promise.race([document.fonts?.ready, new Promise((r) => setTimeout(r, 1600))]), new Promise((r) => setTimeout(r, seen ? 0 : 1700))]);
+  try { sessionStorage.setItem('levit.seen', '1'); } catch { /* storage unavailable */ }
   root.classList.add('is-ready'); root.dispatchEvent(new Event('ready'));
 }
 reveal();
@@ -520,4 +545,9 @@ reveal();
 initHeroes();
 dispatchEvent(new Event('scroll'));   // the dock and header state depend on the hero's height
 document.addEventListener('levit:quick', (e) => openQuick(e.detail));
+document.addEventListener('levit:offer', (e) => {
+  offer = e.detail; store.set('levit.offer', offer); renderBag();
+  toast(`${offer.code} unlocked: ${offer.pct}% off, applied in your bag`);
+});
+initOffer({ claimed: () => !!offer });
 document.addEventListener('levit:wish', (e) => { if (byId(e.detail) && !wish.has(e.detail)) toggleWish(e.detail); });

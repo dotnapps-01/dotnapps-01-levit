@@ -1,5 +1,5 @@
 import { inr } from '../products.js';
-import { $, $$, pad, scope, looks } from './util.js';
+import { $, $$, pad, reduced, scope, looks } from './util.js';
 
 /* the hero headline follows the look on screen */
 const HEAD = {
@@ -22,15 +22,15 @@ export function mount(hero) {
   const set = looks(), S = scope();
   hero.className = 'rf';
   hero.innerHTML = `<div class="rf__bg" aria-hidden="true">${set.map(() => '<i></i>').join('')}</div>
-    <div class="rf__side"><p class="eyebrow"><span class="eyebrow__dot"></span>AW26 · Womenswear</p><h1 class="rf__t" aria-live="polite">${headHTML(HEAD[set[0].id] || HOME)}</h1><p>Swipe through eight looks from our boutique, save the ones you love, shop in one tap.</p><a class="rf__shop rf__shop--big" href="#shop">Shop the edit</a></div>
+    <div class="rf__side"><p class="eyebrow"><span class="eyebrow__dot"></span>AW26 · Womenswear</p><h1 class="rf__t" aria-live="polite">${headHTML(HEAD[set[0].id] || HOME)}</h1><p>Swipe through eight looks from our boutique, save the ones you love, shop in one tap.</p><a class="rf__shop rf__shop--big" href="shop.html">Shop the edit</a></div>
     <div class="rf__col">
       <p class="rf__h rf__t" aria-hidden="true">${headHTML(HEAD[set[0].id] || HOME)}</p>
-      <a class="rf__skip" href="#shop">Skip to shop ↓</a>
+      <a class="rf__skip" href="shop.html"><span>Skip to shop</span><i aria-hidden="true"></i></a>
       <div class="rf__scroll" id="rf-scroll" tabindex="-1">${set.map((p, k) => `<section class="rf__s" data-i="${k}" aria-label="${p.name}"><img src="${p.photo}" alt="${p.name}" ${k > 0 ? 'fetchpriority="low" ' : 'fetchpriority="high" '}decoding="async" draggable="false">
         <div class="rf__shade"></div>
         <div class="rf__info"><p class="rf__no">${pad(k + 1)} / ${pad(set.length)}</p><h2>${p.name}</h2><div class="rf__row"><span>${inr(p.price)}</span><button class="rf__shop" type="button" data-quick="${p.id}">Shop this look</button></div></div>
         <button class="rf__heart" type="button" data-id="${p.id}" aria-pressed="false" aria-label="Save ${p.name}">${HEART}</button></section>`).join('')}
-        <section class="rf__s rf__end"><div><p class="eyebrow"><span class="eyebrow__dot"></span>AW26 · Womenswear</p><h2>Soft structure, <em>every day.</em></h2><a class="rf__shop rf__shop--big" href="#shop">Shop the edit</a><p class="rf__down">Keep scrolling for the full collection</p></div></section></div>
+        <section class="rf__s rf__end"><div><p class="eyebrow"><span class="eyebrow__dot"></span>AW26 · Womenswear</p><h2>Soft structure, <em>every day.</em></h2><a class="rf__shop rf__shop--big" href="shop.html">Shop the edit</a><p class="rf__down">Keep scrolling for the full collection</p></div></section></div>
       <div class="rf__dots" aria-hidden="true">${set.map(() => '<i></i>').join('')}</div>
       <p class="rf__cue" id="rf-cue" aria-hidden="true"><i></i><span>Swipe up</span></p></div>`;
   const sc = $('#rf-scroll', hero), dots = $$('.rf__dots i', hero), cue = $('#rf-cue', hero), bgs = $$('.rf__bg i', hero), col = $('.rf__col', hero);
@@ -66,5 +66,21 @@ export function mount(hero) {
     const on = h.getAttribute('aria-pressed') !== 'true'; h.setAttribute('aria-pressed', on);
     if (on) document.dispatchEvent(new CustomEvent('levit:wish', { detail: h.dataset.id }));
   });
+  // autoplay: the reel moves on by itself, pauses the moment a visitor touches it, and picks up again after a rest
+  let cur = 0, idle = 0, timer = 0, visible = true, hover = false;
+  const slideH = () => sc.clientHeight;
+  const go = (k) => { sc.scrollTo({ top: slideH() * k, behavior: 'smooth' }); };
+  const wrap = () => { col.classList.add('is-wrap'); setTimeout(() => { sc.scrollTo({ top: 0, behavior: 'auto' }); col.classList.remove('is-wrap'); }, 260); };
+  const step = () => {
+    if (reduced || !visible || hover || document.hidden || Date.now() < idle) return;
+    const k = Math.round(sc.scrollTop / Math.max(1, slideH()));
+    if (k >= set.length - 1) wrap(); else go(k + 1);
+  };
+  const rest = (ms = 8000) => { idle = Date.now() + ms; };
+  ['pointerdown', 'touchstart', 'wheel', 'keydown'].forEach((ev) => S.on(sc, ev, () => rest(), { passive: true }));
+  S.on(hero, 'pointerenter', (e) => { if (e.pointerType === 'mouse') hover = true; }); S.on(hero, 'pointerleave', () => { hover = false; });
+  new IntersectionObserver(([en]) => { visible = en.isIntersecting; }, { threshold: 0.4 }).observe(hero);
+  S.add(() => clearInterval(timer));
+  timer = setInterval(step, 4600);
   return () => S.clear();
 }

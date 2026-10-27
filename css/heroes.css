@@ -63,3 +63,14 @@
 .rf__scroll { -webkit-overflow-scrolling: touch; }
 .rf__s > img { transform: translateZ(0); backface-visibility: hidden; }
 @media (max-width: 899px) { .rf__bg { display: none; } }
+
+/* the skip pill is the way out of the reel, so it gently draws the eye: a soft pulse, a shimmer and a nudging arrow */
+.rf__skip { display: inline-flex; align-items: center; gap: 9px; background: rgba(255, 255, 255, .94); color: var(--ink); overflow: hidden; animation: skip-pulse 2.6s ease-out infinite; }
+.rf__skip span { position: relative; z-index: 1; }
+.rf__skip i { position: relative; z-index: 1; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; rotate: -45deg; animation: skip-nudge 1.4s ease-in-out infinite; }
+.rf__skip::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(168, 83, 30, .28) 50%, transparent 70%); translate: -120% 0; animation: skip-shine 3.2s ease-in-out infinite; }
+@keyframes skip-pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, .55); } 70%, 100% { box-shadow: 0 0 0 14px rgba(255, 255, 255, 0); } }
+@keyframes skip-nudge { 0%, 100% { translate: 0 -2px; } 50% { translate: 3px 3px; } }
+@keyframes skip-shine { 0%, 55% { translate: -120% 0; } 100% { translate: 120% 0; } }
+.rf__col.is-wrap .rf__scroll { opacity: 0; } .rf__scroll { transition: opacity .25s; }
+@media (prefers-reduced-motion: reduce) { .rf__skip, .rf__skip i, .rf__skip::after { animation: none; } }

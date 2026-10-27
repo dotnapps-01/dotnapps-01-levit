@@ -36,3 +36,9 @@ The site is static, so there is no build step. Import this repository into Verce
 
 ## Run locally
 `python3 -m http.server 8080` in this folder, then open http://localhost:8080.
+
+## Pages and offers
+- `index.html` is the home page (reel hero, collections, a short edit of 8 pieces with a "Shop all" button, story, boutique, newsletter). `shop.html` is the dedicated shop page: breadcrumb, category chips, sort, layout toggle, every piece, and `?cat=dresses` style links (the footer, the collections list and the menu use them).
+- **Hero reel** advances by itself every 4.6 seconds, pauses the moment a visitor touches or hovers it and resumes after a rest, and loops. The **Skip to shop** pill pulses, shimmers and nudges its arrow, and goes straight to the shop page.
+- **Preloader**: a hanger swings once over the LEVIT wordmark with a hairline progress, then lifts away. Once per visit.
+- **Welcome offer**: about 9 seconds after arriving (once per visit, never on top of another dialog) a card asks to be scratched. Revealing it (or tapping "Show my offer") unlocks `LEVIT10`, 10% off, which the bag and checkout apply automatically. See `js/offer.js`; change `CODE`, `PCT` and `DELAY` at the top.
