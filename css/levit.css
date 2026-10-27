@@ -299,13 +299,7 @@ html.skip-pre.js:not(.is-ready) body { overflow: auto; }
 @media (min-width: 900px) { .craft__grid { grid-template-columns: .85fr 1.15fr; gap: clamp(40px, 7vw, 120px); } }
 .craft__swatch { position: relative; width: min(100%, 520px); aspect-ratio: 1; margin-inline: auto; }
 .swatch { position: absolute; inset: 14%; border-radius: 50%; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.08); }
-.swatch span { position: absolute; inset: -20%; background:
-  linear-gradient(90deg, rgba(40,14,2,.55) 3px, transparent 3px) 0 0 / 20px 20px,
-  linear-gradient(rgba(40,14,2,.55) 3px, transparent 3px) 0 0 / 20px 20px,
-  radial-gradient(circle at 38% 32%, rgba(255,214,170,.34), transparent 62%) 0 0 / 20px 20px,
-  radial-gradient(circle at 32% 28%, #cf6b2b, var(--rust) 45%, #5e280c 100%);
-  animation: weave 24s linear infinite; }
-@keyframes weave { to { translate: 20px 20px; } }
+.swatch img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
 .craft__ring { position: absolute; inset: 0; animation: spin 30s linear infinite; }
 .craft__ring text { font: 500 8.6px var(--sans); letter-spacing: .3em; fill: var(--sage); }
 .pillars { display: grid; margin-top: 44px; border-top: 1px solid rgba(216,194,170,.25); }
@@ -516,7 +510,7 @@ body:has(dialog[open]) { overflow: hidden; }
   .marquee__track, .ticker__track { animation: none; }
   .js [data-reveal], .js .foot__word span { opacity: 1; translate: 0 0; transition: none; }
   .js [data-reveal="arch"] { clip-path: none; }
-  .eyebrow__dot, .craft__ring, .swatch span,   .card:hover .garment__swing, .quick__stage .garment__swing { animation: none; }
+  .eyebrow__dot, .craft__ring,   .card:hover .garment__swing, .quick__stage .garment__swing { animation: none; }
   .cursor { display: none !important; }
 }
 

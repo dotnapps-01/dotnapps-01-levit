@@ -2,7 +2,7 @@
  * used on cards, the quick view and the hero. */
 
 export const CATEGORIES = [
-  { id: 'knitwear', name: 'Knitwear', blurb: 'Waffle, rib and soft merino-feel knits.' },
+  { id: 'knitwear', name: 'Knitwear', blurb: 'Ribbed, cropped and soft-touch knits for layering.' },
   { id: 'dresses', name: 'Dresses', blurb: 'Ruched, polka and after-dark silhouettes.' },
   { id: 'tops', name: 'Tops', blurb: 'Puff sleeves, button plackets, easy tees.' },
   { id: 'bottoms', name: 'Bottoms', blurb: 'Wide-leg, denim and pleated skirts.' },

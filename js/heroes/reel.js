@@ -25,7 +25,7 @@ export function mount(hero) {
     <div class="rf__side"><p class="eyebrow"><span class="eyebrow__dot"></span>AW26 · Womenswear</p><h1 class="rf__t" aria-live="polite">${headHTML(HEAD[set[0].id] || HOME)}</h1><p>Swipe through eight looks from our boutique, save the ones you love, shop in one tap.</p><a class="rf__shop rf__shop--big" href="shop.html">Shop the edit</a></div>
     <div class="rf__col">
       <p class="rf__h rf__t" aria-hidden="true">${headHTML(HEAD[set[0].id] || HOME)}</p>
-      <a class="rf__skip" href="shop.html"><span>Skip to shop</span><i aria-hidden="true"></i></a>
+      <a class="rf__skip" href="#shop" data-skip><span>Skip to shop</span><i aria-hidden="true"></i></a>
       <div class="rf__scroll" id="rf-scroll" tabindex="-1">${set.map((p, k) => `<section class="rf__s" data-i="${k}" aria-label="${p.name}"><img src="${p.photo}" alt="${p.name}" ${k > 0 ? 'fetchpriority="low" ' : 'fetchpriority="high" '}decoding="async" draggable="false">
         <div class="rf__shade"></div>
         <div class="rf__info"><p class="rf__no">${pad(k + 1)} / ${pad(set.length)}</p><h2>${p.name}</h2><div class="rf__row"><span>${inr(p.price)}</span><button class="rf__shop" type="button" data-quick="${p.id}">Shop this look</button></div></div>
@@ -34,6 +34,11 @@ export function mount(hero) {
       <div class="rf__dots" aria-hidden="true">${set.map(() => '<i></i>').join('')}</div>
       <p class="rf__cue" id="rf-cue" aria-hidden="true"><i></i><span>Swipe up</span></p></div>`;
   const sc = $('#rf-scroll', hero), dots = $$('.rf__dots i', hero), cue = $('#rf-cue', hero), bgs = $$('.rf__bg i', hero), col = $('.rf__col', hero);
+  // "Skip to shop" glides down the page to the shop section instead of leaving it
+  $('[data-skip]', hero)?.addEventListener('click', (e) => {
+    const t = document.getElementById('shop'); if (!t) return;
+    e.preventDefault(); t.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+  });
   // desktop backdrop: two average colours per photo (top and bottom) as a gradient, instead of a live image blur
   if (matchMedia('(min-width: 900px)').matches) set.forEach((p, k) => {
     const im = new Image(); im.src = p.photo;
