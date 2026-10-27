@@ -1,7 +1,7 @@
 # LEVIT — womenswear storefront
 
-Static e-commerce front end for the LEVIT womenswear brand, served at `/levit`.
-No build step: open `levit/index.html` through any static server.
+Static e-commerce front end for the LEVIT womenswear brand.
+No build step: open `index.html` through any static server.
 
 ```bash
 cd levit && python3 -m http.server 8080
