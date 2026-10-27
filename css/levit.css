@@ -563,6 +563,9 @@ input, select, textarea { font-size: max(16px, 1em); }
 .toast:not(:popover-open) { display: none; }
 @media (max-width: 699px) { .card__meta { flex-direction: column; gap: 2px; } .card__name { font-size: .92rem; } .card__price { font-size: .9rem; } }
 
-/* on a phone the page scrolls behind the status bar: extend the header's background up over that strip */
-.head::after { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: env(safe-area-inset-top, 0px); background: inherit; -webkit-backdrop-filter: inherit; backdrop-filter: inherit; pointer-events: none; }
-.head.on-hero::after { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* on a phone the page scrolls behind the status bar and the header sticks just below it. Once the header is pinned,
+   paint a solid strip above it (more than any status bar is tall) so no page content shows through the gap. */
+.head::after { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 0; background: var(--sand-3); pointer-events: none; }
+.head.is-pinned::after { height: 160px; }
+.head.on-hero::after { height: 0; }
+.head.is-pinned:not(.on-hero) { background: var(--sand-3); }

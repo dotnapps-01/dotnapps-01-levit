@@ -383,6 +383,7 @@ let themeNow = '';
 let lastY = scrollY;
 const onScroll = () => {
   head.classList.toggle('is-stuck', scrollY > 8);
+  head.classList.toggle('is-pinned', scrollY >= 36);               // the announce bar has scrolled away: the header is truly pinned
   // the header (and dock) sit over the hero photo and change look once you scroll past it
   const atTop = scrollY < 24;                                       // header floats clear over the hero only here
   const heroFills = heroEl.offsetTop + heroEl.offsetHeight - scrollY > innerHeight * 0.55;
