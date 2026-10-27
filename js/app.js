@@ -142,11 +142,19 @@ function cardHTML(p, i) {
   </article>`;
 }
 
+const dressEdit = () => PRODUCTS.filter((p) => p.cat === 'dresses').slice(0, 4);
+function renderDresses() {
+  const g = $('#dress-grid'); if (!g) return;
+  g.innerHTML = dressEdit().map(cardHTML).join('');
+  $$('#dress-grid [data-reveal]').forEach(observeReveal);
+  const sec = $('#dresses'); if (sec) sec.hidden = !g.children.length;
+}
+
 function renderGrid() {
   let list = visibleProducts();
   const g = $('#grid');
   g.dataset.view = view;
-  if (g.dataset.limit) list = list.slice(0, innerWidth < 700 ? 4 : +g.dataset.limit);       // the home page shows a short edit
+  if (g.dataset.limit) { const dr = new Set(dressEdit().map((p) => p.id)); list = list.filter((p) => !dr.has(p.id)).slice(0, innerWidth < 700 ? 4 : +g.dataset.limit); }       // the home page shows a short edit; its dresses have their own section
   g.innerHTML = list.length
     ? list.map(cardHTML).join('')
     : `<div class="grid__empty"><p>${filter === 'saved' ? 'Nothing saved yet. Tap the heart on any piece.' : 'Nothing here yet.'}</p><button class="btn btn--ink" type="button" data-chip="all"><span>See everything</span></button></div>`;
@@ -185,12 +193,12 @@ document.addEventListener('click', (e) => {
   if (a && onShopPage) { e.preventDefault(); setFilter(a.dataset.filter, true); }
 });
 
-$('#grid').addEventListener('click', (e) => {
+[$('#grid'), $('#dress-grid')].forEach((g) => g?.addEventListener('click', (e) => {
   const w = e.target.closest('[data-wish]');
   if (w) { toggleWish(w.dataset.wish, w); return; }
   const q = e.target.closest('[data-qadd]');
   if (q) { saveSize(q.dataset.size); addToBag(q.dataset.qadd, q.dataset.size, colorOf[q.dataset.qadd] ?? 0, 1, { open: false }); }
-});
+}));
 
 function toggleWish(id, btn) {
   const on = !wish.has(id);
@@ -574,7 +582,7 @@ function applyCatalog(d) {
   return true;
 }
 const syncCatalog = async () => applyCatalog(await catalogFetch());
-function refreshShop() { renderIndex(); renderChips(); renderGrid(); renderBag(); updateCounts(); }
+function refreshShop() { renderIndex(); renderChips(); renderGrid(); renderDresses(); renderBag(); updateCounts(); }
 if (onShopPage) {
   const c = new URLSearchParams(location.search).get('cat');
   if (c && (c === 'saved' || CATEGORIES.some((x) => x.id === c))) filter = c;
