@@ -39,7 +39,11 @@ function closeToast() {
 }
 
 const priceHTML = (p) => `${inr(p.price)}${p.was ? ` <s>${inr(p.was)}</s>` : ''}`;
-const FREE_SHIP = 1999, SHIP = 99, COD = 49;
+let FREE_SHIP = 1999, SHIP = 99, COD = 49;
+let live = false;                                  // true once /api/catalog answered: orders go to the dashboard
+let cfg = { offer: { code: 'LEVIT10', pct: 10, active: true, delay: 9 } };
+const stockOf = (p, size) => (p?.stock ? p.stock[size] ?? 0 : 9);        // static fallback data has no stock numbers
+const liveCats = () => CATEGORIES.filter((c) => PRODUCTS.some((p) => p.cat === c.id));
 
 /* ───────────────────────── state ───────────────────────── */
 const SIZE_KEY = 'levit.size';
@@ -85,7 +89,7 @@ document.addEventListener('click', (e) => {
 /* ───────────────────────── index (collections) ───────────────────────── */
 function renderIndex() {
   if (!$('#index')) return;
-  $('#index').innerHTML = CATEGORIES.map((c, i) => {
+  $('#index').innerHTML = liveCats().map((c, i) => {
     const n = PRODUCTS.filter((p) => p.cat === c.id).length;
     return `<li data-reveal style="--d:${i * 0.06}s"><a href="shop.html?cat=${c.id}" data-filter="${c.id}" data-cat="${c.id}">
       <span class="index__no">0${i + 1}</span>
@@ -99,7 +103,7 @@ function renderIndex() {
 /* ───────────────────────── shop ───────────────────────── */
 function renderChips() {
   if (!$('#chips')) return;
-  const all = [{ id: 'all', name: 'All' }, ...CATEGORIES];
+  const all = [{ id: 'all', name: 'All' }, ...liveCats()];
   if (wish.size) all.push({ id: 'saved', name: 'Saved' });
   $('#chips').innerHTML = all.map((c) => {
     const n = c.id === 'all' ? PRODUCTS.length : c.id === 'saved' ? wish.size : PRODUCTS.filter((p) => p.cat === c.id).length;
@@ -129,7 +133,7 @@ function cardHTML(p, i) {
       </button>
       ${tag}
       <button class="card__wish" aria-pressed="${wish.has(p.id)}" aria-label="Save ${p.name} to wishlist" data-wish="${p.id}">${heart}</button>
-      <div class="card__quick" role="group" aria-label="Quick add ${p.name}"><span>Add</span>${SIZES.map((s) => `<button data-qadd="${p.id}" data-size="${s}" aria-label="Add size ${s} to bag">${s}</button>`).join('')}</div>
+      <div class="card__quick" role="group" aria-label="Quick add ${p.name}"><span>Add</span>${SIZES.map((s) => (stockOf(p, s) > 0 ? `<button data-qadd="${p.id}" data-size="${s}" aria-label="Add size ${s} to bag">${s}</button>` : `<button disabled aria-label="Size ${s} sold out" style="opacity:.35;text-decoration:line-through">${s}</button>`)).join('')}</div>
     </div>
     <div class="card__meta">
       <h3 class="card__name">${p.name}</h3>
@@ -211,10 +215,10 @@ function openQuick(id) {
   $('#q-price').innerHTML = `${inr(p.price)}${p.was ? ` <s>${inr(p.was)}</s> <span class="off">−${sale}%</span>` : ''}`;
   $('#q-blurb').textContent = p.blurb;
   $('#q-details').innerHTML = p.details.map((d) => `<li>${d}</li>`).join('');
-  $('#q-sizes').innerHTML = SIZES.map((s) => `<button type="button" data-qsize="${s}" aria-pressed="false">${s}</button>`).join('');
+  $('#q-sizes').innerHTML = SIZES.map((s) => (stockOf(p, s) > 0 ? `<button type="button" data-qsize="${s}" aria-pressed="false">${s}</button>` : `<button type="button" disabled aria-label="Size ${s} sold out" style="opacity:.35;text-decoration:line-through">${s}</button>`)).join('');
   $('#q-err').textContent = '';
   const saved = savedSize();
-  if (saved) { Q.size = saved; $$('#q-sizes button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.qsize === saved)); $('#q-tip').textContent = `Your saved size: ${saved}`; } else $('#q-tip').textContent = '';
+  if (saved && stockOf(p, saved) > 0) { Q.size = saved; $$('#q-sizes button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.qsize === saved)); $('#q-tip').textContent = `Your saved size: ${saved}`; } else $('#q-tip').textContent = '';
   $('#q-pin-msg').textContent = ''; $('#q-pin-in').value = '';
   const w = $('#q-wish'); w.dataset.id = id; w.setAttribute('aria-pressed', wish.has(id));
   drawQuickColors(); drawQuickMedia(); syncAdd();
@@ -255,6 +259,8 @@ $('#q-pin').addEventListener('submit', (e) => {
 /* ───────────────────────── bag ───────────────────────── */
 function addToBag(id, size, ci, qty = 1, { open = true } = {}) {
   const hit = bag.find((l) => l.id === id && l.size === size && l.ci === ci);
+  const cap = Math.min(9, stockOf(byId(id), size)), have = bag.filter((l) => l.id === id && l.size === size).reduce((n, l) => n + l.qty, 0);
+  if (have + qty > cap) { toast(`Only ${cap} left in size ${size}`); if (have >= cap) return; qty = cap - have; }
   hit ? (hit.qty += qty) : bag.push({ id, size, ci, qty });
   saveBag(); updateCounts(); renderBag();
   const p = byId(id);
@@ -307,7 +313,7 @@ $('#lines').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
   const d = b.dataset;
   const undo = (i, l) => toast(`${byId(l.id).name} removed`, { label: 'Undo', fn: () => { bag.splice(i, 0, l); saveBag(); updateCounts(); renderBag(); } });
-  if (d.inc !== undefined) bag[+d.inc].qty = Math.min(9, bag[+d.inc].qty + 1);
+  if (d.inc !== undefined) { const l = bag[+d.inc], cap = Math.min(9, stockOf(byId(l.id), l.size)); if (l.qty >= cap) toast(`Only ${cap} left in size ${l.size}`); l.qty = Math.min(cap, l.qty + 1); }
   else if (d.dec !== undefined) { const l = bag[+d.dec]; if (l.qty > 1) l.qty--; else { const [r] = bag.splice(+d.dec, 1); undo(+d.dec, r); } }
   else if (d.rm !== undefined) { const [r] = bag.splice(+d.rm, 1); undo(+d.rm, r); }
   else return;
@@ -336,7 +342,7 @@ $('#checkout-btn').addEventListener('click', () => {
 });
 $$('input[name="pay"]').forEach((r) => r.addEventListener('change', renderCheckoutSummary));
 
-$('#co-form').addEventListener('submit', (e) => {
+$('#co-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
   let first = null;
@@ -349,15 +355,36 @@ $('#co-form').addEventListener('submit', (e) => {
   if (first) { first.focus(); toast('Please check the highlighted fields'); return; }
   const btn = $('#co-submit');
   btn.disabled = true; btn.firstElementChild.textContent = 'Placing order…';
-  setTimeout(() => {
-    $('#done-name').textContent = ', ' + f.name.value.trim().split(' ')[0];
-    $('#done-email').textContent = f.email.value.trim();
-    $('#done-no').textContent = 'LV-' + Math.floor(100000 + Math.random() * 900000);
-    $('#done-art').innerHTML = garmentSVG('knit', { c: '#a8531e' });
-    $('#co-done').hidden = false;
-    bag = []; saveBag(); updateCounts(); renderBag(); f.reset();
-    btn.disabled = false; btn.firstElementChild.textContent = 'Place order';
-  }, 900);
+  const reset = () => { btn.disabled = false; btn.firstElementChild.textContent = 'Place order'; };
+  let id = 'LV-' + Math.floor(100000 + Math.random() * 900000);
+  if (live) {
+    try {
+      const r = await fetch('/api/orders', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer: { name: f.name.value.trim(), email: f.email.value.trim(), phone: f.phone.value.trim() },
+          address: { address: f.address.value.trim(), city: f.city.value.trim(), pin: f.pin.value.trim() },
+          pay: $('input[name="pay"]:checked').value, offerCode: offer?.code || '',
+          lines: bag.map((l) => ({ id: l.id, size: l.size, qty: l.qty })),
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        toast(d.error || 'We could not place your order. Please try again.');
+        if (r.status === 409) { await syncCatalog(); refreshShop(); renderCheckoutSummary(); }
+        reset(); return;
+      }
+      id = d.id;
+    } catch { toast('Connection problem. Please try again.'); reset(); return; }
+  } else await new Promise((r) => setTimeout(r, 900));
+  $('#done-name').textContent = ', ' + f.name.value.trim().split(' ')[0];
+  $('#done-email').textContent = f.email.value.trim();
+  $('#done-no').textContent = id;
+  $('#done-art').innerHTML = garmentSVG('knit', { c: '#a8531e' });
+  $('#co-done').hidden = false;
+  bag = []; saveBag(); updateCounts(); renderBag(); f.reset();
+  reset();
+  if (live) syncCatalog().then(refreshShop);
 });
 $$('#co-form input').forEach((i) => i.addEventListener('input', () => i.classList.remove('bad')));
 
@@ -526,11 +553,35 @@ if (fine && !reduced) {
 }
 
 /* ───────────────────────── boot ───────────────────────── */
+/* the live catalogue (api/catalog): prices, stock, hidden pieces and fees come from the dashboard.
+   If the API is not there (a static preview), the built-in catalogue is used as it is. */
+async function syncCatalog() {
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 1500);
+    const r = await fetch('/api/catalog', { signal: ctl.signal }); clearTimeout(t);
+    if (!r.ok || !(r.headers.get('content-type') || '').includes('json')) return false;
+    const d = await r.json();
+    if (!Array.isArray(d.products) || !d.products.length) return false;
+    PRODUCTS.splice(0, PRODUCTS.length, ...d.products.map((p) => ({ ...p, real: true })));
+    CATEGORIES.splice(0, CATEGORIES.length, ...d.categories);
+    const c = d.settings; FREE_SHIP = c.freeShip; SHIP = c.shipFee; COD = c.codFee; cfg = c; live = true;
+    bag = bag.filter((l) => byId(l.id)); wish = new Set([...wish].filter(byId));
+    if (offer) { offer = c.offer.active ? { code: c.offer.code, pct: c.offer.pct } : null; store.set('levit.offer', offer); }
+    return true;
+  } catch { return false; }
+}
+function refreshShop() { renderIndex(); renderChips(); renderGrid(); renderBag(); updateCounts(); }
+await syncCatalog();
+if (live) {
+  const cod = $('input[name="pay"][value="cod"] + span small'); if (cod) cod.textContent = `+ ₹${COD} handling`;
+  const cd = $('#co-cod-row dd'); if (cd) cd.textContent = '₹' + COD;
+  const note = $('.checkout__note'); if (note) note.textContent = 'No payment is taken online yet. We confirm your order by phone or email.';
+}
 if (onShopPage) {
   const c = new URLSearchParams(location.search).get('cat');
-  if (c && (c === 'saved' || CATEGORIES.some((x) => x.id === c))) filter = c;
+  if (c && (c === 'saved' || CATEGORIES.some((x) => x.id === c))) filter = c; else if (c) filter = 'all';
 }
-renderIndex(); renderChips(); renderGrid(); renderBag(); updateCounts();
+refreshShop();
 $$('[data-reveal]').forEach(observeReveal);
 
 async function reveal() {
@@ -546,8 +597,8 @@ initHeroes();
 dispatchEvent(new Event('scroll'));   // the dock and header state depend on the hero's height
 document.addEventListener('levit:quick', (e) => openQuick(e.detail));
 document.addEventListener('levit:offer', (e) => {
-  offer = e.detail; store.set('levit.offer', offer); renderBag();
+  offer = e.detail; if (live) fetch('/api/offer-claim', { method: 'POST', keepalive: true }).catch(() => {}); store.set('levit.offer', offer); renderBag();
   toast(`${offer.code} unlocked: ${offer.pct}% off, applied in your bag`);
 });
-initOffer({ claimed: () => !!offer });
+initOffer({ claimed: () => !!offer, ...cfg.offer });
 document.addEventListener('levit:wish', (e) => { if (byId(e.detail) && !wish.has(e.detail)) toggleWish(e.detail); });

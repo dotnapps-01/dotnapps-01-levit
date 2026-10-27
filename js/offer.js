@@ -1,12 +1,14 @@
 /* Welcome offer: a little while after arriving, a card asks to be scratched. Scratching it (or tapping
    "Show my offer") unlocks LEVIT10, which the bag and checkout then apply. Shown once per visit. */
-const CODE = 'LEVIT10', PCT = 10, DELAY = 9000, SEEN = 'levit.offer.seen';
+const SEEN = 'levit.offer.seen';
 const $ = (s, r = document) => r.querySelector(s);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-export function initOffer({ claimed }) {
+export function initOffer({ claimed, code: CODE = 'LEVIT10', pct: PCT = 10, delay = 9, active = true }) {
   const dlg = $('#offer');
-  if (!dlg) return;
+  if (!dlg || !active) return;
+  const DELAY = delay * 1000;
+  $('#offer-code').textContent = CODE; $('.offer__prize b').textContent = `${PCT}% off`; $('#offer-copy').textContent = `Copy code ${CODE}`;
   const cv = $('#offer-cv'), card = $('#offer-card'), ctx = cv.getContext('2d', { willReadFrequently: true });
   let done = false, down = false, lx = 0, ly = 0, n = 0, W = 0, H = 0, tries = 0;
 

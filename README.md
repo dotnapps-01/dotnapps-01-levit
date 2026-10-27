@@ -19,8 +19,7 @@ cd levit && python3 -m http.server 8080
 - `js/app.js` — filters, quick view, bag drawer, simulated checkout, search, wishlist (bag and wishlist persist in `localStorage`)
 - `fonts/` — self-hosted WOFF2
 
-Checkout is a demo: no payment is taken and nothing is sent anywhere.
-To add a piece: drop its photo in `img/p/` and add an entry with a `photo` path to `products.js`.
+`js/products.js` is the built-in starting catalogue. With the API running, the live catalogue from the admin dashboard replaces it (prices, stock, hidden pieces, shipping and offer settings); without the API the store still works from the built-in data and checkout stays a demo.
 
 
 ## Shop design and ease of use
@@ -32,7 +31,7 @@ To add a piece: drop its photo in `img/p/` and add an entry with a `photo` path 
 - **Search** opens with recent and popular searches and trending pieces.
 
 ## Deploying to Vercel
-The site is static, so there is no build step. Import this repository into Vercel as a new project: Framework Preset **Other**, leave Build Command and Output Directory empty, Root Directory stays `./`. `vercel.json` adds clean URLs, security headers and caching (fonts are immutable, images cache for a day, HTML/CSS/JS always revalidate).
+The storefront is static (no build step) and the `api/` folder is one Vercel serverless function for the dashboard. Import this repository into Vercel as a new project: Framework Preset **Other**, leave Build Command and Output Directory empty, Root Directory stays `./`. `vercel.json` adds clean URLs, security headers and caching (fonts are immutable, images cache for a day, HTML/CSS/JS always revalidate).
 
 ## Run locally
 `python3 -m http.server 8080` in this folder, then open http://localhost:8080.
@@ -41,4 +40,26 @@ The site is static, so there is no build step. Import this repository into Verce
 - `index.html` is the home page (reel hero, collections, a short edit of 8 pieces with a "Shop all" button, story, boutique, newsletter). `shop.html` is the dedicated shop page: breadcrumb, category chips, sort, layout toggle, every piece, and `?cat=dresses` style links (the footer, the collections list and the menu use them).
 - **Hero reel** advances by itself every 4.6 seconds, pauses the moment a visitor touches or hovers it and resumes after a rest, and loops. The **Skip to shop** pill pulses, shimmers and nudges its arrow, and goes straight to the shop page.
 - **Preloader**: a hanger swings once over the LEVIT wordmark with a hairline progress, then lifts away. Once per visit.
-- **Welcome offer**: about 9 seconds after arriving (once per visit, never on top of another dialog) a card asks to be scratched. Revealing it (or tapping "Show my offer") unlocks `LEVIT10`, 10% off, which the bag and checkout apply automatically. See `js/offer.js`; change `CODE`, `PCT` and `DELAY` at the top.
+- **Welcome offer** (code, percentage, delay and on/off are set in the admin dashboard): about 9 seconds after arriving (once per visit, never on top of another dialog) a card asks to be scratched. Revealing it (or tapping "Show my offer") unlocks `LEVIT10`, 10% off, which the bag and checkout apply automatically. See `js/offer.js`.
+
+
+## Admin dashboard (`/admin`)
+A private back office for orders, products, customers and offers. Sign in at `https://your-site/admin/`.
+
+- **Overview**: revenue, orders, average order, customers, a 14 day revenue chart, orders by status, best sellers, low stock and recent orders.
+- **Orders**: filter by status, search, open an order to move it through New → Packed → Shipped → Delivered (or cancel, which puts the items back in stock), add an internal note, print a packing slip, export CSV.
+- **Products**: add, edit, hide or delete pieces; price and compare-at price, label, description, per-size stock, colours, photo (pick an existing one or upload, resized in the browser). Sold-out sizes are struck through in the store and orders are refused when stock runs out.
+- **Customers**: grouped by email with order count and spend.
+- **Offers & settings**: the welcome-offer code, percentage, delay and on/off (with scratched / redeemed counts), free-shipping threshold, shipping fee and COD fee.
+
+Prices, stock, offer discount, shipping and COD fee are always recalculated on the server, so the browser can not set its own price.
+
+### Set it up on Vercel
+1. **Storage**: in the Vercel project, Storage → Marketplace → add **Upstash Redis** (free tier is plenty) and connect it to this project. This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` (or the `UPSTASH_REDIS_REST_*` pair). Without it the data is kept in memory and is lost on restarts.
+2. **Password**: Settings → Environment Variables → add `ADMIN_PASSWORD` (a long one). Optionally add `ADMIN_SECRET` (any random string) to sign sessions. Without `ADMIN_PASSWORD` the admin stays locked on Vercel.
+3. Redeploy. The first visit to the dashboard seeds the catalogue from `api/_lib/seed.json` (regenerate it from `js/products.js` with `node scripts/gen-seed.mjs`; the stock numbers there are placeholders, set the real ones in Products).
+
+Sessions are an HTTP-only cookie signed with the password, valid for 7 days, and sign-in attempts are throttled. `/admin` and `/api` are marked `noindex` and are disallowed in `robots.txt`.
+
+### Run locally with the API
+`node dev-server.mjs` (port 8080, or `PORT=8090 node dev-server.mjs`) serves the site and the API together. Admin password locally is `levit-admin` unless `ADMIN_PASSWORD` is set; data is saved in `.data/db.json`.

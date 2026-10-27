@@ -183,9 +183,8 @@ export const PRODUCTS = [
   },
 ];
 
-/* the catalogue is photographed pieces only: drop categories with nothing in them */
+/* every piece is photographed; categories with nothing in them are hidden where they are drawn */
 PRODUCTS.forEach((p) => { p.real = true; });
-for (let i = CATEGORIES.length - 1; i >= 0; i--) if (!PRODUCTS.some((p) => p.cat === CATEGORIES[i].id)) CATEGORIES.splice(i, 1);
 
 export const inr = (n) => '₹' + n.toLocaleString('en-IN');
 export const byId = (id) => PRODUCTS.find((p) => p.id === id);

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0B0907">
+<title>LEVIT Admin</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preload" href="../fonts/jost-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- sign in -->
+<main class="auth" id="auth" hidden>
+  <form class="auth__card" id="login" autocomplete="on">
+    <p class="auth__logo">LEVIT</p>
+    <h1>Admin</h1>
+    <p class="auth__hint" id="auth-hint">Sign in to manage orders, products and offers.</p>
+    <label class="field"><span>Password</span><input id="pw" type="password" autocomplete="current-password" required autofocus></label>
+    <p class="auth__err" id="auth-err" role="alert"></p>
+    <button class="btn btn--ink" type="submit" id="login-btn">Sign in</button>
+    <a class="auth__back" href="../">← Back to the store</a>
+  </form>
+</main>
+
+<!-- app shell -->
+<div class="shell" id="shell" hidden>
+  <aside class="side" id="side" aria-label="Admin">
+    <a class="side__brand" href="#/overview"><b>LEVIT</b><small>Admin</small></a>
+    <nav class="side__nav" id="nav">
+      <a href="#/overview" data-r="overview"><svg viewBox="0 0 24 24"><path d="M4 13h6V4H4zM14 20h6V11h-6zM14 4h6v4h-6zM4 20h6v-4H4z"/></svg><span>Overview</span></a>
+      <a href="#/orders" data-r="orders"><svg viewBox="0 0 24 24"><path d="M5 8h14l-1 12.5H6zM8.5 10V6.5a3.5 3.5 0 0 1 7 0V10"/></svg><span>Orders</span><em id="nav-orders" hidden>0</em></a>
+      <a href="#/products" data-r="products"><svg viewBox="0 0 24 24"><path d="M12 5.5v-1a2 2 0 1 1 2 2L12 8 3.5 15.5c-1 .9-.4 2.500 1 2.500h15c1.400 0 2-1.600 1-2.500L12 8z"/></svg><span>Products</span></a>
+      <a href="#/customers" data-r="customers"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.500 20c.6-3.600 3-5.500 6.500-5.500s5.900 1.900 6.500 5.500M16 5a3.500 3.500 0 0 1 0 6.500M18 14.800c2 .6 3.200 2.300 3.500 5.200"/></svg><span>Customers</span></a>
+      <a href="#/settings" data-r="settings"><svg viewBox="0 0 24 24"><path d="M20 7H9M5 7H4M20 17h-3M13 17H4"/><circle cx="7" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg><span>Offers &amp; settings</span></a>
+    </nav>
+    <div class="side__foot">
+      <a href="../" target="_blank" rel="noopener">View store ↗</a>
+      <button type="button" id="logout">Sign out</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <button class="top__menu" id="menu-btn" type="button" aria-label="Open menu"><span></span><span></span></button>
+      <h1 id="title">Overview</h1>
+      <div class="top__actions" id="actions"></div>
+    </header>
+    <div class="banner" id="banner" hidden></div>
+    <main class="view" id="view" tabindex="-1"></main>
+  </div>
+</div>
+
+<!-- slide-over panel (order details, product editor) -->
+<div class="scrim" id="scrim" hidden></div>
+<aside class="panel" id="panel" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="panel-title" tabindex="-1">
+  <header class="panel__head"><h2 id="panel-title"></h2><button class="x" id="panel-x" type="button" aria-label="Close">✕</button></header>
+  <div class="panel__body" id="panel-body"></div>
+  <footer class="panel__foot" id="panel-foot"></footer>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

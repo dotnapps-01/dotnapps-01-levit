@@ -1,0 +1,12 @@
+{
+  "name": "levit",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "LEVIT womenswear storefront with an admin dashboard",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "seed": "node scripts/gen-seed.mjs"
+  }
+}
