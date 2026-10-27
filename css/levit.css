@@ -46,7 +46,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-top: calc(var(--head-h) + 12px); }
+html { background: #0B0907; -webkit-text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-top: calc(var(--head-h) + 12px); }
 body {
   margin: 0; background: var(--sand-3); color: var(--ink);
   font: 400 1rem/1.6 var(--sans); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
@@ -117,32 +117,6 @@ body::after {
 .count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--ink); color: var(--cream); font: 500 .68rem/18px var(--sans); text-align: center; }
 .count.bump { animation: bump .5s var(--ease); }
 @keyframes bump { 40% { scale: 1.5; } }
-
-/* ─────────── preloader ─────────── */
-.preloader { --p: 0; position: fixed; inset: 0; z-index: 1000; display: none; overflow: hidden; background: #0B0907; color: var(--sand); visibility: visible; }
-.js .preloader { display: block; animation: pl-failsafe 0s 6s forwards; }
-.pl__word { position: absolute; left: 0; right: 0; top: clamp(22px, 6svh, 56px); display: flex; justify-content: center; gap: .18em; margin: 0; font: 900 clamp(1.1rem, 3.4vw, 1.6rem)/1 var(--serif); letter-spacing: .2em; overflow: hidden; }
-.pl__word span { display: block; translate: 0 110%; animation: rise .9s var(--ease) forwards; } .pl__word span:nth-child(2) { animation-delay: .06s; } .pl__word span:nth-child(3) { animation-delay: .12s; } .pl__word span:nth-child(4) { animation-delay: .18s; } .pl__word span:nth-child(5) { animation-delay: .24s; }
-/* the arch: real photos flash through it as the count climbs, ending on the first look */
-.pl__arch { position: absolute; left: 50%; top: 50%; width: min(70vw, 56svh * .75, 380px); aspect-ratio: 3 / 4; translate: -50% -50%; border-radius: 999px 999px 10px 10px; overflow: hidden; background: #1b1511; box-shadow: 0 0 0 1px rgba(216, 194, 170, .35), 0 0 0 10px #0B0907, 0 0 0 11px rgba(216, 194, 170, .22), 0 40px 90px rgba(0, 0, 0, .6); transition: width .9s var(--ease-io), height .9s var(--ease-io), aspect-ratio .9s, border-radius .9s var(--ease-io), box-shadow .6s; animation: arch-in 1s var(--ease) both; }
-@keyframes arch-in { from { clip-path: inset(40% 30% 0 30% round 999px 999px 0 0); } to { clip-path: inset(0 round 999px 999px 10px 10px); } }
-.pl__photos { position: absolute; inset: 0; }
-.pl__photos img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; opacity: 0; scale: 1.12; }
-.pl__photos img.is-on { opacity: 1; scale: 1; transition: scale .5s var(--ease); }
-.pl__count { position: absolute; left: clamp(20px, 5vw, 64px); bottom: clamp(18px, 5svh, 52px); display: flex; align-items: baseline; font: 900 clamp(4.6rem, 20vw, 11rem)/.8 var(--serif); letter-spacing: -.04em; font-variant-numeric: tabular-nums; color: var(--cream); mix-blend-mode: difference; z-index: 3; transition: opacity .35s; }
-.pl__count u { text-decoration: none; font-size: .34em; margin-left: .06em; opacity: .7; }
-.pl__sub { position: absolute; right: clamp(20px, 5vw, 64px); bottom: clamp(26px, 6svh, 62px); margin: 0; font: italic 400 1.05rem/1 var(--serif); letter-spacing: .08em; opacity: 0; animation: fade .8s .5s forwards; z-index: 3; transition: opacity .35s; }
-/* leaving: the arch grows until the photo fills the screen, then the intro dissolves into the page */
-.pl-out .pl__word, .pl-out .pl__count, .pl-out .pl__sub { opacity: 0 !important; transition: opacity .3s; animation: none; }
-.pl-out .pl__arch { width: 100vw; aspect-ratio: auto; height: 100svh; border-radius: 0; box-shadow: none; }
-.is-ready .preloader { opacity: 0; pointer-events: none; visibility: hidden; transition: opacity .6s ease, visibility 0s .6s; }
-@keyframes rise { to { translate: 0 0; } }
-@keyframes fade { to { opacity: .85; } }
-@keyframes pl-failsafe { to { visibility: hidden; pointer-events: none; } }
-.js:not(.is-ready) body { overflow: hidden; }
-/* repeat visits skip the intro */
-.skip-pre .preloader { display: none !important; }
-html.skip-pre.js:not(.is-ready) body { overflow: auto; }
 
 /* ─────────── announcement + header ─────────── */
 .announce { height: var(--announce-h); background: var(--forest); color: var(--sand); overflow: hidden; font: 500 .72rem/var(--announce-h) var(--sans); letter-spacing: .2em; text-transform: uppercase; }
@@ -517,7 +491,6 @@ body:has(dialog[open]) { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .preloader { display: none !important; }
   .js:not(.is-ready) body { overflow: auto; }
   .marquee__track, .ticker__track { animation: none; }
   .js [data-reveal], .js .foot__word span { opacity: 1; translate: 0 0; transition: none; }
@@ -532,7 +505,7 @@ body:has(dialog[open]) { overflow: hidden; }
    Over the hero it turns dark glass, and it slides away while you scroll down. */
 .tabbar { display: none; }
 @media (max-width: 699px) {
-  body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .foot { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
   .tabbar { position: fixed; z-index: 55; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom)); translate: -50% 0; display: flex; gap: 2px; padding: 5px; border-radius: 99px; background: rgba(255, 250, 242, .66); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6); border: 1px solid rgba(255, 255, 255, .6); box-shadow: 0 12px 32px rgba(40, 25, 10, .2); color: var(--ink); transition: translate .5s var(--ease), background .4s, border-color .4s, box-shadow .4s; }
   .tabbar.is-away { translate: -50% 180%; }
   .tabbar a, .tabbar button { position: relative; display: flex; align-items: center; justify-content: center; height: 46px; min-width: 46px; padding: 0 12px; border-radius: 99px; color: inherit; opacity: .78; transition: padding .4s var(--ease), background .3s, color .3s, opacity .3s; }
@@ -541,7 +514,7 @@ body:has(dialog[open]) { overflow: hidden; }
   .tabbar .is-on { opacity: 1; padding: 0 16px 0 14px; background: var(--ink); color: #fff; } .tabbar .is-on span { max-width: 70px; margin-left: 8px; opacity: 1; }
   .tabbar .count { top: 4px; right: 2px; min-width: 16px; height: 16px; font-size: .6rem; line-height: 16px; background: var(--rust); }
   .tabbar .is-on .count { right: -2px; }
-  .over-hero .tabbar { background: rgba(18, 14, 11, .34); border-color: rgba(255, 255, 255, .2); box-shadow: 0 12px 32px rgba(0, 0, 0, .35); color: #fff; }
+  .over-hero .tabbar { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(18, 14, 11, .58); border-color: rgba(255, 255, 255, .2); box-shadow: 0 12px 32px rgba(0, 0, 0, .35); color: #fff; }
   .over-hero .tabbar .is-on { background: rgba(255, 255, 255, .94); color: var(--ink); }
   .head__r .icon-btn { display: none; }
   .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }

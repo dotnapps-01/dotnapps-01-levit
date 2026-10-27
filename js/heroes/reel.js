@@ -21,19 +21,30 @@ const HEART = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" strok
 export function mount(hero) {
   const set = looks(), S = scope();
   hero.className = 'rf';
-  hero.innerHTML = `<div class="rf__bg" aria-hidden="true">${set.map((p) => `<img src="${p.photo}" alt="">`).join('')}</div>
+  hero.innerHTML = `<div class="rf__bg" aria-hidden="true">${set.map(() => '<i></i>').join('')}</div>
     <div class="rf__side"><p class="eyebrow"><span class="eyebrow__dot"></span>AW26 · Womenswear</p><h1 class="rf__t" aria-live="polite">${headHTML(HEAD[set[0].id] || HOME)}</h1><p>Swipe through eight looks from our boutique, save the ones you love, shop in one tap.</p><a class="rf__shop rf__shop--big" href="#shop">Shop the edit</a></div>
     <div class="rf__col">
       <p class="rf__h rf__t" aria-hidden="true">${headHTML(HEAD[set[0].id] || HOME)}</p>
       <a class="rf__skip" href="#shop">Skip to shop ↓</a>
-      <div class="rf__scroll" id="rf-scroll" tabindex="-1">${set.map((p, k) => `<section class="rf__s" data-i="${k}" aria-label="${p.name}"><img src="${p.photo}" alt="${p.name}" ${k > 1 ? 'loading="lazy" ' : ''}decoding="async" draggable="false">
+      <div class="rf__scroll" id="rf-scroll" tabindex="-1">${set.map((p, k) => `<section class="rf__s" data-i="${k}" aria-label="${p.name}"><img src="${p.photo}" alt="${p.name}" ${k > 0 ? 'fetchpriority="low" ' : 'fetchpriority="high" '}decoding="async" draggable="false">
         <div class="rf__shade"></div>
         <div class="rf__info"><p class="rf__no">${pad(k + 1)} / ${pad(set.length)}</p><h2>${p.name}</h2><div class="rf__row"><span>${inr(p.price)}</span><button class="rf__shop" type="button" data-quick="${p.id}">Shop this look</button></div></div>
         <button class="rf__heart" type="button" data-id="${p.id}" aria-pressed="false" aria-label="Save ${p.name}">${HEART}</button></section>`).join('')}
         <section class="rf__s rf__end"><div><p class="eyebrow"><span class="eyebrow__dot"></span>AW26 · Womenswear</p><h2>Soft structure, <em>every day.</em></h2><a class="rf__shop rf__shop--big" href="#shop">Shop the edit</a><p class="rf__down">Keep scrolling for the full collection</p></div></section></div>
       <div class="rf__dots" aria-hidden="true">${set.map(() => '<i></i>').join('')}</div>
       <p class="rf__cue" id="rf-cue" aria-hidden="true"><i></i><span>Swipe up</span></p></div>`;
-  const sc = $('#rf-scroll', hero), dots = $$('.rf__dots i', hero), cue = $('#rf-cue', hero), bgs = $$('.rf__bg img', hero), col = $('.rf__col', hero);
+  const sc = $('#rf-scroll', hero), dots = $$('.rf__dots i', hero), cue = $('#rf-cue', hero), bgs = $$('.rf__bg i', hero), col = $('.rf__col', hero);
+  // desktop backdrop: two average colours per photo (top and bottom) as a gradient, instead of a live image blur
+  if (matchMedia('(min-width: 900px)').matches) set.forEach((p, k) => {
+    const im = new Image(); im.src = p.photo;
+    im.onload = () => {
+      try {
+        const cv = document.createElement('canvas'); cv.width = 4; cv.height = 8; const cx = cv.getContext('2d'); cx.drawImage(im, 0, 0, 4, 8);
+        const avg = (y0, y1) => { const d = cx.getImageData(0, y0, 4, y1 - y0).data; let r = 0, g = 0, b = 0, n = d.length / 4; for (let q = 0; q < d.length; q += 4) { r += d[q]; g += d[q + 1]; b += d[q + 2]; } return [r / n * 0.55, g / n * 0.55, b / n * 0.55].map(Math.round).join(','); };
+        bgs[k].style.background = `linear-gradient(rgb(${avg(0, 4)}), rgb(${avg(4, 8)}))`;
+      } catch { /* canvas blocked: the dark fallback stays */ }
+    };
+  });
   const heads = $$('.rf__t', hero);
   let shown = -2;
   const setHead = (k) => {
@@ -46,7 +57,7 @@ export function mount(hero) {
   const io = new IntersectionObserver((es) => es.forEach((en) => {
     if (!en.isIntersecting || en.intersectionRatio < 0.6) return;
     const k = en.target.dataset.i === undefined ? -1 : +en.target.dataset.i;
-    mark(k); if (k !== 0) cue.classList.add('gone');
+    requestAnimationFrame(() => { mark(k); if (k !== 0) cue.classList.add('gone'); });
   }), { root: sc, threshold: [0.6] });
   $$('.rf__s', hero).forEach((s) => io.observe(s)); S.add(() => io.disconnect());
   mark(0);
