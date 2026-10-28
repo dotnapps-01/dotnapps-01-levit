@@ -10,6 +10,7 @@ export const DEFAULT_CATEGORIES = seed.categories;
 const DEFAULT_SETTINGS = {
   storeName: 'LEVIT',
   freeShip: 1999, shipFee: 99, codFee: 49, lowStock: 2,
+  fromAddress: '',
   paused: false, pauseMessage: 'We are taking a short break from orders. Please check back soon.',
   offer: { code: 'LEVIT10', pct: 10, active: true, delay: 9 },
   coupons: [],
@@ -62,6 +63,7 @@ export async function saveSettings(input) {
     storeName: String(input.storeName ?? cur.storeName).slice(0, 40) || 'LEVIT',
     freeShip: int(input.freeShip, cur.freeShip), shipFee: int(input.shipFee, cur.shipFee), codFee: int(input.codFee, cur.codFee),
     lowStock: int(input.lowStock, cur.lowStock, 0, 50),
+    fromAddress: String(input.fromAddress ?? cur.fromAddress ?? '').replace(/\r/g, '').trim().slice(0, 220),
     paused: input.paused === undefined ? cur.paused : Boolean(input.paused),
     pauseMessage: String(input.pauseMessage ?? cur.pauseMessage).slice(0, 200) || DEFAULT_SETTINGS.pauseMessage,
     offer,

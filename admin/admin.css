@@ -207,9 +207,6 @@ input[type=checkbox] { width: 22px; height: 22px; min-height: 0; padding: 0; acc
 .dlg__box { width: min(400px, 100%); background: #fff; border-radius: 22px; padding: 24px; display: grid; gap: 10px; box-shadow: 0 30px 80px rgba(0, 0, 0, .4); } .dlg__box h2 { font: 800 1.2rem/1.2 var(--serif); } .dlg__box p { color: var(--muted); }
 .dlg__btns { display: flex; gap: 10px; margin-top: 8px; } .dlg__btns .btn { flex: 1; } .dlg__box.danger #dlg-yes { background: var(--bad); border-color: var(--bad); }
 
-@media print {
-  body * { visibility: hidden; } #panel, #panel * { visibility: visible; } .panel { position: static; translate: 0 0; width: 100%; height: auto; box-shadow: none; display: block; } .panel__foot, .x, .steps, .quick, .noprint, .panel__grab { display: none !important; }
-}
 @media (prefers-reduced-motion: reduce) { * { transition-duration: .01s !important; animation: none !important; } }
 
 /* bars that stick to the bottom live in .view directly so position: sticky has room to work */
@@ -237,3 +234,33 @@ label.is-busy { opacity: .5; pointer-events: none; } label.is-busy::after { cont
 .daterange--inline { flex: 1 1 100%; } .daterange--inline input { min-height: 44px; }
 @media (max-width: 480px) { .daterange .field { max-width: none; } .daterange > .btn { flex: 1 1 100%; } }
 #range { flex-wrap: wrap; overflow: visible; }
+
+/* ---- printing: only #slip prints, one page per order ---- */
+.slip-root { display: none; }
+@media print {
+  html, body { background: #fff !important; }
+  body > *:not(#slip) { display: none !important; }
+  .slip-root { display: block; color: #000; font: 400 11pt/1.35 "Jost", system-ui, sans-serif; }
+  .slip { box-sizing: border-box; overflow: hidden; break-after: page; page-break-after: always; break-inside: avoid; }
+  .slip:last-child { break-after: auto; page-break-after: auto; }
+  .slip p { margin: 0; } .slip h4 { margin: 0 0 4px; font: 500 8pt/1 "Jost", sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+  /* A4 packing slip */
+  .slip--a4 { height: 271mm; display: grid; grid-template-rows: auto auto auto auto auto 1fr; gap: 6mm; align-content: start; }
+  .s-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 4mm; } .s-brand { font: 900 26pt/1 "Playfair Display", Georgia, serif; letter-spacing: .08em; } .s-head div { text-align: right; font-size: 10.5pt; }
+  .s-cols { display: grid; grid-template-columns: 1.4fr 1fr; gap: 6mm; } .s-box { border: 1px solid #000; padding: 4mm; display: grid; gap: 1.5mm; } .s-name { font: 800 15pt/1.15 "Playfair Display", Georgia, serif; }
+  .s-cod { border: 2px solid #000; padding: 3mm 4mm; font-weight: 500; font-size: 13pt; text-align: center; letter-spacing: .04em; text-transform: uppercase; }
+  .s-items { width: 100%; border-collapse: collapse; font-size: 10.5pt; } .s-items th { text-align: left; border-bottom: 1.5px solid #000; padding: 2mm 1mm; font: 500 8.5pt/1 "Jost", sans-serif; letter-spacing: .1em; text-transform: uppercase; } .s-items td { padding: 2mm 1mm; border-bottom: .5px solid #999; } .s-items .r { text-align: right; }
+  .s-tot { justify-self: end; width: 70mm; display: grid; gap: 1.5mm; font-size: 10.5pt; } .s-tot div { display: flex; justify-content: space-between; } .s-tot .g { border-top: 1.5px solid #000; padding-top: 2mm; font-weight: 500; font-size: 13pt; }
+  .s-foot { align-self: end; border-top: 1px solid #000; padding-top: 3mm; font-size: 9.5pt; display: grid; gap: 1mm; } .s-from { color: #333; }
+  /* package labels: big and plain so they scan and read from a distance */
+  .slip--label, .slip--small { display: grid; align-content: space-between; gap: 2mm; border: 1.2pt solid #000; padding: 3mm; }
+  .slip--label { height: 140mm; font-size: 11pt; } .slip--small { height: 95mm; font-size: 8.5pt; padding: 2mm; }
+  .l-top { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1.5pt solid #000; padding-bottom: 1.5mm; } .l-top b { font: 900 18pt/1 "Playfair Display", Georgia, serif; letter-spacing: .08em; } .l-top span { font-weight: 500; font-size: 12pt; letter-spacing: .04em; }
+  .slip--small .l-top b { font-size: 13pt; } .slip--small .l-top span { font-size: 9.5pt; }
+  .l-to small, .l-from small { font: 500 7pt/1 "Jost", sans-serif; letter-spacing: .16em; }
+  .l-name { font: 800 20pt/1.1 "Playfair Display", Georgia, serif; margin: 1mm 0; } .l-addr { font-size: 13pt; line-height: 1.25; } .l-pin { font: 500 17pt/1.2 "Jost", sans-serif; margin-top: 1.5mm; letter-spacing: .03em; } .l-ph { font-size: 12pt; margin-top: 1mm; }
+  .slip--small .l-name { font-size: 14pt; } .slip--small .l-addr { font-size: 9.5pt; } .slip--small .l-pin { font-size: 12pt; } .slip--small .l-ph { font-size: 9pt; }
+  .l-pay { border: 1.5pt solid #000; text-align: center; padding: 2mm; font-weight: 500; font-size: 11pt; letter-spacing: .05em; text-transform: uppercase; } .l-pay.cod { background: #000; color: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 14pt; }
+  .slip--small .l-pay { font-size: 8.5pt; padding: 1mm; } .slip--small .l-pay.cod { font-size: 10.5pt; }
+  .l-items { font-size: 9pt; color: #222; } .slip--small .l-items { font-size: 7.5pt; } .l-trk { font-size: 9.5pt; font-weight: 500; } .l-from { font-size: 8.5pt; border-top: .8pt dashed #000; padding-top: 1.5mm; } .slip--small .l-from { font-size: 6.5pt; }
+}

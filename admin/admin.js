@@ -333,11 +333,13 @@ async function viewOrders() {
     const n = ui.sel.size;
     bar.innerHTML = `<div class="stickybar"><b>${n} selected</b><span style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn--sm" type="button" data-all>${n === current().length && n ? 'Clear' : 'Select all'}</button>
+      <button class="btn btn--sm" type="button" data-print ${n ? '' : 'disabled'}>Print</button>
       ${['packed', 'shipped', 'delivered'].map((s) => `<button class="btn btn--sm btn--ok" type="button" data-bulk="${s}" ${n ? '' : 'disabled'}>${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}
       <button class="btn btn--sm" type="button" data-bulk="cancelled" ${n ? '' : 'disabled'}>Cancel</button>
       <button class="btn btn--sm" type="button" data-bulk="delete" ${n ? '' : 'disabled'} style="border-color:#f0a59d;color:#ffb4ab">Delete</button>
       <button class="btn btn--sm" type="button" data-done>Done</button></span></div>`;
     $('[data-all]', bar).onclick = () => { const all = current(); if (n === all.length) ui.sel.clear(); else all.forEach((o) => ui.sel.add(o.id)); paint(); };
+    $('[data-print]', bar).onclick = guard(() => printOrders(ordersCache.filter((o) => ui.sel.has(o.id))));
     $('[data-done]', bar).onclick = () => { ui.selecting = false; ui.sel.clear(); paint(); };
     $$('[data-bulk]', bar).forEach((b) => b.onclick = guard(async () => {
       const to = b.dataset.bulk, ids = [...ui.sel];
@@ -393,7 +395,7 @@ function openOrder(o) {
       <div><button class="btn btn--sm" id="otsave" type="button">Save payment and tracking</button></div></section>
     <section class="sec noprint"><h3>Internal note</h3><textarea id="onote" placeholder="Anything the team should know" maxlength="500">${esc(o.note)}</textarea><div><button class="btn btn--sm" id="osave" type="button">Save note</button></div></section>
     <section class="sec"><h3>History</h3><ul class="timeline">${o.history.map((h) => `<li><span class="pill s-${h.status}">${h.status}</span><small>${when(h.at, true)}</small></li>`).join('')}</ul></section>`;
-  openPanel(`Order ${o.id}`, body, `<button class="btn btn--danger" id="odel" type="button" style="margin-right:auto;flex:0 0 auto">Delete</button><button class="btn" id="oprint" type="button">${ICON.print} Print slip</button>`);
+  openPanel(`Order ${o.id}`, body, `<button class="btn btn--danger" id="odel" type="button" style="margin-right:auto;flex:0 0 auto">Delete</button><button class="btn" id="oprint" type="button">${ICON.print} Print…</button>`);
   const patch = guard(async (data, msg) => {
     const order = await patchOrder(o.id, data); toast(msg || 'Saved');
     if (data.status) { openOrder(order); if (route === 'orders') window.__repaintOrders?.(); else if (route === 'overview') render(); }
@@ -406,13 +408,67 @@ function openOrder(o) {
   $('#opaid').addEventListener('change', (e) => patch({ paid: e.target.checked }, e.target.checked ? 'Marked paid' : 'Marked unpaid'));
   $('#otsave').addEventListener('click', () => patch({ paid: $('#opaid').checked, tracking: { courier: $('#otc').value, number: $('#otn').value } }, 'Saved'));
   $('#osave').addEventListener('click', () => patch({ note: $('#onote').value }, 'Note saved'));
-  $('#oprint').addEventListener('click', () => print());
+  $('#oprint').addEventListener('click', guard(() => printOrders([o])));
   $('#odel').addEventListener('click', guard(async () => {
     const back = o.status !== 'cancelled' && o.status !== 'delivered';
     if (!(await confirmBox({ title: `Delete order ${o.id}?`, text: `This removes the order for good${back ? ' and puts its items back in stock' : ''}. To keep a record, cancel it instead.`, yes: 'Delete order', danger: true }))) return;
     await api('orders/' + encodeURIComponent(o.id), { method: 'DELETE', body: {} });
     ordersCache = ordersCache.filter((x) => x.id !== o.id); toast(`${o.id} deleted`); refreshBadge(); closePanel(); render();
   }));
+}
+
+/* ---------- printing: one page per order, A4 packing slip or a package label ---------- */
+const SLIPS = {
+  a4: { name: 'A4 packing slip', note: 'Full page: items, totals and address', page: 'A4', margin: '12mm' },
+  label: { name: 'Package label · 4 × 6 in', note: '100 × 150 mm, to stick on the parcel', page: '100mm 150mm', margin: '4mm' },
+  small: { name: 'Small label · 3 × 4 in', note: '76 × 102 mm', page: '76mm 102mm', margin: '3mm' },
+};
+function pickPrintSize(count) {
+  return new Promise((res) => {
+    let last = 'a4'; try { last = localStorage.getItem('levit.printSize') || 'a4'; } catch { /* ignore */ }
+    const d = document.createElement('div'); d.className = 'dlg';
+    d.innerHTML = `<div class="dlg__box" role="dialog" aria-modal="true" aria-label="Print size"><h2>Print ${count > 1 ? count + ' orders' : 'order'}</h2><p>One page per order. Pick the paper.</p>
+      <div class="menu">${Object.entries(SLIPS).map(([k, v]) => `<button type="button" data-k="${k}" ${k === last ? 'style="border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)"' : ''}><span style="display:grid"><b style="font-weight:500">${v.name}</b><small class="hint">${v.note}</small></span></button>`).join('')}</div>
+      <div class="dlg__btns"><button class="btn" type="button" data-x>Cancel</button></div></div>`;
+    document.body.append(d);
+    const done = (v) => { d.remove(); res(v); };
+    d.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) { try { localStorage.setItem('levit.printSize', b.dataset.k); } catch { /* ignore */ } done(b.dataset.k); } else if (e.target === d || e.target.closest('[data-x]')) done(null); });
+  });
+}
+function slipHTML(o, size, from) {
+  const cod = o.pay === 'cod', items = o.lines.reduce((n, l) => n + l.qty, 0), when_ = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const payLine = cod ? `CASH ON DELIVERY · COLLECT ${inr(o.total)}` : o.paid ? 'PREPAID' : `${PAY[o.pay] || o.pay} · payment pending`;
+  const trk = o.tracking?.number ? `${o.tracking.courier ? esc(o.tracking.courier) + ' · ' : ''}${esc(o.tracking.number)}` : '';
+  if (size === 'a4') {
+    return `<section class="slip slip--a4">
+      <header class="s-head"><b class="s-brand">LEVIT</b><div><b>Packing slip</b><br>Order ${esc(o.id)} · ${when_}</div></header>
+      <div class="s-cols"><div class="s-box"><h4>Ship to</h4><p class="s-name">${esc(o.customer.name)}</p><p>${esc(o.address.address)}<br>${esc(o.address.city)} ${esc(o.address.pin)}</p><p>Phone ${esc(o.customer.phone)}</p></div>
+        <div class="s-box"><h4>Order</h4><p>${esc(PAY[o.pay] || o.pay)}${o.paid ? ' · paid' : ''}</p>${trk ? `<p>Tracking: ${trk}</p>` : ''}<p>${items} item${items === 1 ? '' : 's'}</p>${o.customer.email ? `<p>${esc(o.customer.email)}</p>` : ''}</div></div>
+      ${cod ? `<p class="s-cod">Cash on delivery: collect ${inr(o.total)}</p>` : ''}
+      <table class="s-items"><thead><tr><th>Item</th><th>Size</th><th>Qty</th><th class="r">Price</th><th class="r">Total</th></tr></thead><tbody>${o.lines.map((l) => `<tr><td>${esc(l.name)}</td><td>${esc(l.size)}</td><td>${l.qty}</td><td class="r">${inr(l.price)}</td><td class="r">${inr(l.price * l.qty)}</td></tr>`).join('')}</tbody></table>
+      <div class="s-tot"><div><span>Subtotal</span><span>${inr(o.subtotal)}</span></div>${o.discount ? `<div><span>Discount${o.offer ? ' (' + esc(o.offer) + ')' : ''}</span><span>−${inr(o.discount)}</span></div>` : ''}<div><span>Shipping</span><span>${o.shipping ? inr(o.shipping) : 'Free'}</span></div>${o.cod ? `<div><span>COD fee</span><span>${inr(o.cod)}</span></div>` : ''}<div class="g"><span>Total</span><span>${inr(o.total)}</span></div></div>
+      <footer class="s-foot"><p>Thank you for shopping with LEVIT. Easy 7-day exchange: keep the tags on and write to us on WhatsApp.</p>${from ? `<p class="s-from">Return address: ${esc(from).replace(/\n/g, ', ')}</p>` : ''}</footer></section>`;
+  }
+  const lines = o.lines.map((l) => `${esc(l.name)} (${esc(l.size)}) ×${l.qty}`), shown = lines.slice(0, size === 'small' ? 2 : 4);
+  return `<section class="slip slip--${size}">
+    <div class="l-top"><b>LEVIT</b><span>${esc(o.id)}</span></div>
+    <div class="l-to"><small>SHIP TO</small><p class="l-name">${esc(o.customer.name)}</p><p class="l-addr">${esc(o.address.address)}</p><p class="l-pin">${esc(o.address.city)} – ${esc(o.address.pin)}</p><p class="l-ph">Phone ${esc(o.customer.phone)}</p></div>
+    <p class="l-pay ${cod ? 'cod' : ''}">${esc(payLine)}</p>
+    <p class="l-items">${items} item${items === 1 ? '' : 's'}: ${shown.join('; ')}${lines.length > shown.length ? ` +${lines.length - shown.length} more` : ''}</p>
+    ${trk ? `<p class="l-trk">${trk}</p>` : ''}
+    <p class="l-from"><small>FROM</small> LEVIT${from ? ' · ' + esc(from).replace(/\n/g, ', ') : ''}</p></section>`;
+}
+async function printOrders(list) {
+  if (!list.length) return;
+  const size = await pickPrintSize(list.length); if (!size) return;
+  let from = ''; try { from = (await api('settings')).settings.fromAddress || ''; } catch (e) { if (e.status === 401) throw e; }
+  const sz = SLIPS[size];
+  let st = $('#slip-style'); if (!st) { st = document.createElement('style'); st.id = 'slip-style'; document.head.append(st); }
+  st.textContent = `@page { size: ${sz.page}; margin: ${sz.margin}; }`;
+  let root = $('#slip'); if (!root) { root = document.createElement('div'); root.id = 'slip'; document.body.append(root); }
+  root.className = 'slip-root slip-root--' + size; root.innerHTML = list.map((o) => slipHTML(o, size, from)).join('');
+  await new Promise((r) => setTimeout(r, 60));
+  closePanel(true); setTimeout(() => print(), 80);
 }
 
 /* ---------- products ---------- */
@@ -855,6 +911,7 @@ async function viewSettings() {
         <label class="field"><span>Shipping fee (₹)</span><input name="shipFee" type="number" inputmode="numeric" min="0" value="${s.shipFee}"></label>
         <label class="field"><span>Cash on delivery fee (₹)</span><input name="codFee" type="number" inputmode="numeric" min="0" value="${s.codFee}"></label>
         <label class="field"><span>Low stock alert at (units per size)</span><input name="lowStock" type="number" inputmode="numeric" min="0" max="50" value="${s.lowStock}"></label>
+        <label class="field"><span>Return address (printed on slips and labels)</span><textarea name="fromAddress" maxlength="220" rows="3" style="min-height:0" placeholder="LEVIT, shop no, street, city, PIN, phone">${esc(s.fromAddress || '')}</textarea></label>
       </div></section>
       <section class="card"><div class="card__h"><h2>Pause orders</h2></div><div class="card__b" style="display:grid;gap:14px">
         <p class="hint">Going on holiday or out of stock everywhere? Pausing shows a bar on the store and stops checkout until you switch it back on.</p>
@@ -873,7 +930,7 @@ async function viewSettings() {
     </div>`;
   $('#sform').addEventListener('submit', guard(async (e) => {
     e.preventDefault(); const f = e.target, btn = $('#ssave'); btn.disabled = true;
-    try { await saveSettingsPatch({ freeShip: f.freeShip.value, shipFee: f.shipFee.value, codFee: f.codFee.value, lowStock: f.lowStock.value, paused: f.paused.checked, pauseMessage: f.pauseMessage.value }); toast('Settings saved'); render(); }
+    try { await saveSettingsPatch({ freeShip: f.freeShip.value, shipFee: f.shipFee.value, codFee: f.codFee.value, lowStock: f.lowStock.value, fromAddress: f.fromAddress.value, paused: f.paused.checked, pauseMessage: f.pauseMessage.value }); toast('Settings saved'); render(); }
     finally { btn.disabled = false; }
   }));
   $('#bk').addEventListener('click', guard(async () => {
