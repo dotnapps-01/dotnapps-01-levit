@@ -57,7 +57,7 @@ Prices, stock, offer discount, shipping and COD fee are always recalculated on t
 ### Set it up on Vercel
 1. **Storage**: in the Vercel project, Storage → Marketplace → add **Upstash Redis** (free tier is plenty) and connect it to this project. This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` (or the `UPSTASH_REDIS_REST_*` pair). Without it the data is kept in memory and is lost on restarts.
 2. **Password**: Settings → Environment Variables → add `ADMIN_PASSWORD` (a long one). Optionally add `ADMIN_SECRET` (any random string) to sign sessions. Without `ADMIN_PASSWORD` the admin stays locked on Vercel.
-3. Redeploy. The first visit to the dashboard seeds the catalogue from `api/_lib/seed.json` (regenerate it from `js/products.js` with `node scripts/gen-seed.mjs`; the stock numbers there are placeholders, set the real ones in Products).
+3. Redeploy. The first visit to the dashboard seeds the catalogue from `api/_lib/seed.js` (regenerate it from `js/products.js` with `node scripts/gen-seed.mjs`; the stock numbers there are placeholders, set the real ones in Products).
 
 Sessions are an HTTP-only cookie signed with the password, valid for 7 days, and sign-in attempts are throttled. `/admin` and `/api` are marked `noindex` and are disallowed in `robots.txt`.
 

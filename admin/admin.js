@@ -43,8 +43,13 @@ $('#login').addEventListener('submit', async (e) => {
 $('#logout').addEventListener('click', async () => { try { await api('logout', { method: 'POST', body: {} }); } catch { /* ignore */ } session = { ...session, authed: false }; showAuth(''); });
 
 async function boot() {
-  try { session = await (await fetch('/api/admin/session', { credentials: 'same-origin' })).json(); }
-  catch { els.auth.hidden = false; $('#auth-err').textContent = 'Cannot reach the API. Run with "node dev-server.mjs" locally, or deploy to Vercel.'; return; }
+  let res, text = '';
+  try { res = await fetch('/api/admin/session', { credentials: 'same-origin' }); text = await res.text(); session = JSON.parse(text); }
+  catch (e) {
+    els.auth.hidden = false;
+    $('#auth-err').textContent = res ? `The API answered with HTTP ${res.status} instead of data: ${text.replace(/\s+/g, ' ').slice(0, 140)}` : 'Cannot reach the API. Locally run "node dev-server.mjs"; on Vercel check the deployment logs.';
+    return;
+  }
   if (!session.authed) return showAuth('');
   els.auth.hidden = true; els.shell.hidden = false;
   const notes = [];

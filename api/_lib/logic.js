@@ -1,8 +1,7 @@
 /* Catalogue, orders and statistics. Prices and totals are always recomputed here, never trusted from the browser. */
-import { readFileSync } from 'node:fs';
 import { db } from './db.js';
+import seed from './seed.js';
 
-const seed = JSON.parse(readFileSync(new URL('./seed.json', import.meta.url), 'utf8'));
 export const SIZES = ['XS', 'S', 'M', 'L', 'XL'];
 export const STATUSES = ['new', 'packed', 'shipped', 'delivered', 'cancelled'];
 export const CATEGORIES = seed.categories;

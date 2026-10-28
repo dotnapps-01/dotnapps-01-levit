@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "LEVIT womenswear storefront with an admin dashboard",
-  "engines": { "node": ">=20" },
+  "engines": { "node": "22.x" },
   "scripts": {
     "dev": "node dev-server.mjs",
     "seed": "node scripts/gen-seed.mjs"
