@@ -53,7 +53,7 @@ async function boot() {
   if (!session.authed) return showAuth('');
   els.auth.hidden = true; els.shell.hidden = false;
   const notes = [];
-  if (!session.persistent) notes.push('<b>Storage is temporary.</b> Orders and edits reset when the server restarts. Add an Upstash Redis database in Vercel (Storage → Marketplace) and redeploy to keep your data.');
+  if (!session.persistent) notes.push('<b>Storage is temporary.</b> Orders and edits reset when the server restarts. Connect a free Neon Postgres or Upstash Redis database in Vercel (Storage) and redeploy to keep your data.');
   if (session.defaultPassword) notes.push('<b>Using the default local password.</b> Set ADMIN_PASSWORD before going live.');
   els.banner.hidden = !notes.length; els.banner.innerHTML = notes.join('<br>');
   refreshBadge(); render();
@@ -326,7 +326,7 @@ async function viewSettings() {
         <label class="field"><span>Cash on delivery fee (₹)</span><input name="codFee" type="number" min="0" value="${s.codFee}"></label>
         <p class="hint">The store reads these values every time a customer checks out, so changes apply right away.</p>
       </div></section>
-      <div style="grid-column:1/-1;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn--ink" type="submit" id="ssave">Save settings</button><span class="hint">Storage: ${session.persistent ? 'permanent (Redis)' : 'temporary (resets on restart)'}</span></div>
+      <div style="grid-column:1/-1;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn btn--ink" type="submit" id="ssave">Save settings</button><span class="hint">Storage: ${session.persistent ? `permanent (${session.storage || 'database'})` : 'temporary (resets on restart)'}</span></div>
     </form>`;
   $('#sform').addEventListener('submit', guard(async (e) => {
     e.preventDefault(); const f = e.target, btn = $('#ssave'); btn.disabled = true;

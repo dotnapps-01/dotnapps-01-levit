@@ -9,7 +9,7 @@
  *            GET/POST /api/admin/products        PUT/DELETE /api/admin/products/:id
  *            GET/PUT /api/admin/settings
  */
-import { db, persistent } from './_lib/db.js';
+import { db, persistent, storage } from './_lib/db.js';
 import { checkPassword, sessionCookie, clearCookie, isAdmin, configured, usingDefaultPassword, throttled, noteFailure } from './_lib/auth.js';
 import {
   publicCatalog, createOrder, allOrders, updateOrder, allProducts, createProduct, updateProduct, deleteProduct,
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
     }
     if (route === 'logout' && method === 'POST') return send(res, 200, { ok: true }, { 'Set-Cookie': clearCookie() });
     if (route === 'session' && method === 'GET') {
-      return send(res, 200, { authed: isAdmin(req), configured, persistent, defaultPassword: usingDefaultPassword });
+      return send(res, 200, { authed: isAdmin(req), configured, persistent, storage, defaultPassword: usingDefaultPassword });
     }
 
     if (!isAdmin(req)) return send(res, 401, { error: 'Sign in required' });
