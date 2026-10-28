@@ -7,7 +7,7 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const inr = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
 const when = (iso, long) => new Date(iso).toLocaleString('en-IN', long ? { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' } : { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 const ago = (iso) => { const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); if (s < 60) return 'just now'; if (s < 3600) return Math.floor(s / 60) + ' min ago'; if (s < 86400) return Math.floor(s / 3600) + ' h ago'; if (s < 604800) return Math.floor(s / 86400) + ' d ago'; return when(iso); };
-const photo = (p) => (!p ? '' : p.startsWith('data:') || p.startsWith('http') ? p : '../' + p);
+const photo = (p) => (!p ? '' : /^(data:|https?:|\/)/.test(p) ? p : '../' + p);
 const STATUS = ['new', 'packed', 'shipped', 'delivered', 'cancelled'];
 const NEXT = { new: ['packed', 'Mark packed'], packed: ['shipped', 'Mark shipped'], shipped: ['delivered', 'Mark delivered'] };
 const SIZES = ['XS', 'S', 'M', 'L', 'XL'];
@@ -31,6 +31,7 @@ const ICON = {
   wa: I('<path d="M4 20l1.3-4A8 8 0 1 1 8.5 19z"/><path d="M9 9.5c.5 2 2 3.5 4.5 4.5l1.2-1.2-1.8-1-.8.7c-.8-.4-1.5-1-1.9-1.9l.7-.8-1-1.8z"/>'),
   mail: I('<path d="M3 6h18v12H3zM3 7l9 7 9-7"/>'),
   print: I('<path d="M7 9V3h10v6M7 17H4v-6h16v6h-3M7 14h10v7H7z"/>'),
+  eye: I('<path d="M14.5 4.5l5 5-2 2-5-5zM12.5 6.5l-8 8V19h4.5l8-8M4.5 19.5l3-3"/>'),
   up: I('<path d="m6 15 6-6 6 6"/>'), down: I('<path d="m6 9 6 6 6-6"/>'),
   store: I('<path d="M4 9l1-5h14l1 5M4 9v11h16V9M4 9a3 3 0 0 0 5.3 1.9A3 3 0 0 0 14.7 11 3 3 0 0 0 20 9M10 20v-5h4v5"/>'),
   out: I('<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>'),
@@ -396,7 +397,7 @@ async function viewProducts() {
   const data = await api('products'); productsCache = data;
   action('+ Add piece', () => openProduct(), 'btn--ink');
   action(ui.reorder ? 'Done' : 'Reorder', () => { ui.reorder = !ui.reorder; render(); });
-  els.view.innerHTML = `<div class="tabs" id="ptabs"></div><div class="bar"><input type="search" id="pq" placeholder="Search pieces" aria-label="Search pieces" value="${esc(ui.prodQ)}">${ui.reorder ? '<p class="hint">Use the arrows to change the order shown in the store.</p>' : ''}</div><section class="card rows" id="plist"></section>`;
+  els.view.innerHTML = `<div class="bar" style="justify-content:flex-start"><button class="btn btn--sm" type="button" id="mcat">Manage categories</button><button class="btn btn--sm" type="button" id="mlab">Manage labels</button></div><div class="tabs" id="ptabs"></div><div class="bar"><input type="search" id="pq" placeholder="Search pieces" aria-label="Search pieces" value="${esc(ui.prodQ)}">${ui.reorder ? '<p class="hint">Use the arrows to change the order shown in the store.</p>' : ''}</div><section class="card rows" id="plist"></section>`;
   const paint = () => {
     const cats = [{ id: 'all', name: 'All' }, ...data.categories.filter((c) => c.id !== 'all')];
     $('#ptabs').innerHTML = cats.map((c) => `<button class="chip" type="button" aria-pressed="${ui.prodCat === c.id}" data-c="${c.id}">${esc(c.name)}</button>`).join('');
@@ -433,10 +434,113 @@ async function viewProducts() {
   }));
   $('#plist').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('[data-open]')) e.target.click(); });
   $('#pq').addEventListener('input', (e) => { ui.prodQ = e.target.value; paint(); });
+  $('#mcat').addEventListener('click', openCategories);
+  $('#mlab').addEventListener('click', openLabels);
   paint();
 }
 
-const colorRow = (c = { name: '', hex: '#cdb494' }) => `<div class="c"><input type="color" value="${esc(c.hex)}" aria-label="Colour"><input type="text" value="${esc(c.name)}" placeholder="Colour name" maxlength="24" aria-label="Colour name"><button type="button" class="x" data-rm aria-label="Remove colour">✕</button></div>`;
+const colorRow = (c = { name: '', hex: '#cdb494' }) => `<div class="c"><input type="color" value="${esc(c.hex)}" aria-label="Colour"><input type="text" value="${esc(c.name)}" placeholder="Colour name" maxlength="24" aria-label="Colour name"><button type="button" class="x" data-eye aria-label="Pick this colour from the photo" title="Pick from the photo">${ICON.eye}</button><button type="button" class="x" data-rm aria-label="Remove colour">✕</button></div>`;
+
+/* ---- colours from the photo: tap the dress, or let the dashboard suggest the main colours ---- */
+const NAMES = { Black: '#111111', Charcoal: '#3a3a3c', Grey: '#8a8a8a', Silver: '#c4c4c4', White: '#fafafa', Ivory: '#f4efe2', Cream: '#efe3c8', Sand: '#d8c2aa', Beige: '#cdb494', Camel: '#b98a55', Tan: '#a8764a', Brown: '#6b4a2f', Mocha: '#5a3d2e', Rust: '#a8531e', Orange: '#e07a2b', Mustard: '#d1a02c', Yellow: '#eed15a', Lime: '#b5c94a', Olive: '#6f7442', Sage: '#9caf88', Green: '#3f7d4f', Forest: '#1f2b24', Teal: '#2f7f80', 'Sky blue': '#8ec1e0', Blue: '#2f5fa8', Navy: '#1f2a4a', Lilac: '#c4b4de', Purple: '#6b3f9a', Pink: '#e88aa5', Blush: '#ebc7bb', Peach: '#f3c3a1', Red: '#c0262d', Maroon: '#6e1f2a', Wine: '#7a2a3d' };
+const rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const hexOf = (r, g, b) => '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+const nameColor = (hex) => { const a = rgbOf(hex); let best = 'Colour', d = 1e9; for (const [n, h] of Object.entries(NAMES)) { const b = rgbOf(h), dd = 2 * (a[0] - b[0]) ** 2 + 4 * (a[1] - b[1]) ** 2 + 3 * (a[2] - b[2]) ** 2; if (dd < d) { d = dd; best = n; } } return best; };
+function loadPixels(src, max = 700) {
+  return new Promise((res, rej) => {
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => { const k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k)); const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, c.width, c.height); res({ c, x }); };
+    im.onerror = () => rej(new Error('Add a photo first, then pick its colours.')); im.src = src;
+  });
+}
+/** Main colours of the photo, centre-weighted so the garment counts more than the background. */
+async function suggestColors(src) {
+  const { c, x } = await loadPixels(src, 96), d = x.getImageData(0, 0, c.width, c.height).data, buckets = new Map();
+  for (let py = 0; py < c.height; py++) for (let px = 0; px < c.width; px++) {
+    const i = (py * c.width + px) * 4; if (d[i + 3] < 200) continue;
+    const r = d[i], g = d[i + 1], b = d[i + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    const dx = (px / c.width - 0.5) / 0.32, dy = (py / c.height - 0.52) / 0.4, w = Math.exp(-(dx * dx + dy * dy) / 2) * (0.35 + (mx - mn) / 255);
+    const k = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4), e = buckets.get(k) || { w: 0, r: 0, g: 0, b: 0 };
+    e.w += w; e.r += r * w; e.g += g * w; e.b += b * w; buckets.set(k, e);
+  }
+  const out = [];
+  for (const e of [...buckets.values()].sort((a, b) => b.w - a.w)) {
+    const col = [e.r / e.w, e.g / e.w, e.b / e.w];
+    if (out.every((o) => (o[0] - col[0]) ** 2 + (o[1] - col[1]) ** 2 + (o[2] - col[2]) ** 2 > 3600)) out.push(col);
+    if (out.length === 5) break;
+  }
+  return out.map((v) => hexOf(...v));
+}
+/** Show the photo big; the person taps a spot and we average a small patch around it. */
+function pickFromPhoto(src) {
+  return new Promise(async (res, rej) => {
+    let px; try { px = await loadPixels(src, 900); } catch (e) { return rej(e); }
+    const d = document.createElement('div'); d.className = 'dlg'; d.innerHTML = `<div class="dlg__box pickbox" role="dialog" aria-modal="true" aria-label="Pick a colour"><h2>Tap the colour you want</h2>
+      <div class="pickwrap"><canvas></canvas><i class="pickdot" hidden></i></div>
+      <div class="pickread"><span class="pickchip"></span><b class="num">Tap the photo</b></div>
+      <div class="dlg__btns"><button class="btn" type="button" data-x>Cancel</button><button class="btn btn--ink" type="button" data-ok disabled>Use this colour</button></div></div>`;
+    document.body.append(d);
+    const cv = $('canvas', d), ctx = cv.getContext('2d'); cv.width = px.c.width; cv.height = px.c.height; ctx.drawImage(px.c, 0, 0);
+    { const k = Math.min(Math.min(420, innerWidth - 80) / cv.width, innerHeight * 0.52 / cv.height); cv.style.width = Math.round(cv.width * k) + 'px'; cv.style.height = Math.round(cv.height * k) + 'px'; }
+    const dot = $('.pickdot', d), chip = $('.pickchip', d), lab = $('.pickread b', d), ok = $('[data-ok]', d); let hex = '';
+    const at = (e) => {
+      const r = cv.getBoundingClientRect(), ex = Math.min(r.width, Math.max(0, e.clientX - r.left)), ey = Math.min(r.height, Math.max(0, e.clientY - r.top));
+      const sx = Math.round((ex / r.width) * cv.width), sy = Math.round((ey / r.height) * cv.height), n = 3, w = Math.min(n, sx, cv.width - sx - 1, sy, cv.height - sy - 1) || 0;
+      const a = px.x.getImageData(Math.max(0, sx - w), Math.max(0, sy - w), 2 * w + 1, 2 * w + 1).data; let R = 0, G = 0, B = 0, N = 0;
+      for (let i = 0; i < a.length; i += 4) { R += a[i]; G += a[i + 1]; B += a[i + 2]; N++; }
+      hex = hexOf(R / N, G / N, B / N); dot.hidden = false; dot.style.left = ex + 'px'; dot.style.top = ey + 'px'; dot.style.background = hex;
+      chip.style.background = hex; lab.textContent = `${hex.toUpperCase()} · ${nameColor(hex)}`; ok.disabled = false;
+    };
+    let down = false; cv.addEventListener('pointerdown', (e) => { down = true; cv.setPointerCapture(e.pointerId); at(e); }); cv.addEventListener('pointermove', (e) => { if (down) at(e); }); cv.addEventListener('pointerup', () => { down = false; });
+    const close = (v) => { d.remove(); v ? res(v) : res(null); };
+    $('[data-x]', d).onclick = () => close(null); ok.onclick = () => close(hex); d.addEventListener('click', (e) => { if (e.target === d) close(null); });
+  });
+}
+
+/* ---------- categories and labels ---------- */
+async function openCategories() {
+  const data = productsCache, count = (id) => data.products.filter((p) => p.cat === id).length;
+  const list = data.categories.filter((c) => c.id !== 'all').map((c) => ({ ...c }));
+  const paint = () => {
+    $('#catlist').innerHTML = list.map((c, i) => `<div class="catrow" data-i="${i}"><div class="catrow__f"><input data-f="name" value="${esc(c.name)}" maxlength="28" placeholder="Category name" aria-label="Category name"><input data-f="blurb" value="${esc(c.blurb || '')}" maxlength="120" placeholder="Short description (optional)" aria-label="Description"></div>
+      <div class="catrow__a"><span class="hint num">${c.id ? count(c.id) : 0} piece${c.id && count(c.id) === 1 ? '' : 's'}</span><span class="arrows"><button type="button" data-mv="-1" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>${ICON.up}</button><button type="button" data-mv="1" aria-label="Move down" ${i === list.length - 1 ? 'disabled' : ''}>${ICON.down}</button><button type="button" data-del aria-label="Delete category" ${c.id && count(c.id) ? 'disabled title="Move or delete its pieces first"' : ''}>✕</button></span></div></div>`).join('');
+  };
+  openPanel('Categories', `<p class="hint">Categories group your pieces in the store (shop filters, the collections list and the footer). Empty categories are hidden from customers.</p><div id="catlist" class="catlist"></div><div><button class="btn btn--sm" id="catadd" type="button">+ Add category</button></div><p class="auth__err" id="caterr" role="alert"></p>`, `<button class="btn btn--ink" id="catsave" type="button">Save categories</button>`);
+  paint();
+  $('#panel-body').onclick = (e) => {
+    const row = e.target.closest('.catrow'); if (!row) return; const i = +row.dataset.i;
+    const mv = e.target.closest('[data-mv]'); if (mv) { const j = i + Number(mv.dataset.mv); [list[i], list[j]] = [list[j], list[i]]; paint(); }
+    if (e.target.closest('[data-del]')) { list.splice(i, 1); paint(); }
+  };
+  $('#panel-body').oninput = (e) => { const row = e.target.closest('.catrow'); if (row && e.target.dataset.f) list[+row.dataset.i][e.target.dataset.f] = e.target.value; };
+  $('#catadd').onclick = () => { list.push({ name: '', blurb: '' }); paint(); $$('.catrow input[data-f=name]').at(-1).focus(); };
+  $('#catsave').onclick = guard(async () => {
+    $('#caterr').textContent = '';
+    try { const r = await api('categories', { method: 'PUT', body: { categories: list.filter((c) => c.name.trim()) } }); data.categories = r.categories; toast('Categories saved'); closePanel(); render(); }
+    catch (err) { if (err.status === 401) throw err; $('#caterr').textContent = err.message; }
+  });
+}
+async function openLabels() {
+  const data = productsCache, count = (n) => data.products.filter((p) => p.tag === n).length;
+  const list = (data.labels || []).map((l) => ({ ...l }));
+  const paint = () => {
+    $('#lablist').innerHTML = list.map((l, i) => `<div class="labrow" data-i="${i}"><input data-f="name" value="${esc(l.name)}" maxlength="18" placeholder="Label name" aria-label="Label name">
+      <label class="switch" title="Give this label a colour"><input type="checkbox" data-f="use" ${l.color ? 'checked' : ''}><i></i></label><input type="color" data-f="color" value="${esc(l.color || '#a8531e')}" ${l.color ? '' : 'disabled'} aria-label="Label colour">
+      <span class="hint num">${count(l.name)}</span><button type="button" class="x" data-del aria-label="Delete label">✕</button></div>`).join('') || '<p class="empty">No labels yet</p>';
+  };
+  openPanel('Labels', `<p class="hint">Labels are the small tags on a piece's photo, like New or Bestseller. Colour them to make them stand out.</p><div id="lablist" class="catlist"></div><div><button class="btn btn--sm" id="labadd" type="button">+ Add label</button></div><p class="auth__err" id="laberr" role="alert"></p>`, `<button class="btn btn--ink" id="labsave" type="button">Save labels</button>`);
+  paint();
+  $('#panel-body').onclick = (e) => { const row = e.target.closest('.labrow'); if (row && e.target.closest('[data-del]')) { list.splice(+row.dataset.i, 1); paint(); } };
+  $('#panel-body').oninput = (e) => {
+    const row = e.target.closest('.labrow'); if (!row) return; const l = list[+row.dataset.i], f = e.target.dataset.f;
+    if (f === 'name') l.name = e.target.value; else if (f === 'color') l.color = e.target.value; else if (f === 'use') { l.color = e.target.checked ? ($('[data-f=color]', row).value || '#a8531e') : ''; $('[data-f=color]', row).disabled = !e.target.checked; }
+  };
+  $('#labadd').onclick = () => { list.push({ name: '', color: '' }); paint(); $$('.labrow input[data-f=name]').at(-1).focus(); };
+  $('#labsave').onclick = guard(async () => {
+    try { const { settings } = await api('settings', { method: 'PUT', body: { labels: list.filter((l) => l.name.trim()) } }); data.labels = settings.labels; toast('Labels saved'); closePanel(); render(); }
+    catch (err) { if (err.status === 401) throw err; $('#laberr').textContent = err.message; }
+  });
+}
 
 function openProduct(p, preset = {}) {
   const isNew = !p || preset.copy;
@@ -444,7 +548,9 @@ function openProduct(p, preset = {}) {
   const prod = { ...base, ...preset };
   const photos = [...new Set(productsCache.products.map((x) => x.photo).filter((x) => x && !x.startsWith('data:')))];
   let chosen = prod.photo || '';
-  const catOpts = productsCache.categories.filter((c) => c.id !== 'all').map((c) => `<option value="${c.id}" ${prod.cat === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  const catOpts = productsCache.categories.filter((c) => c.id !== 'all').map((c) => `<option value="${esc(c.id)}" ${prod.cat === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('') + '<option value="__new">＋ New category…</option>';
+  const labs = productsCache.labels || [];
+  const labOpts = '<option value="">None</option>' + [...labs.map((l) => l.name), ...(prod.tag && !labs.some((l) => l.name === prod.tag) ? [prod.tag] : [])].map((n) => `<option ${prod.tag === n ? 'selected' : ''}>${esc(n)}</option>`).join('') + '<option value="__new">＋ New label…</option>';
   const body = `
     <form id="pform" style="display:grid;gap:16px" novalidate>
       <section class="sec"><h3>Photo</h3><div class="photo"><img id="pprev" src="${esc(photo(chosen))}" alt="" ${chosen ? '' : 'hidden'}><div style="display:grid;gap:10px;min-width:0">
@@ -452,30 +558,63 @@ function openProduct(p, preset = {}) {
         <div class="picker" id="ppick" role="group" aria-label="Pick an existing photo">${photos.map((ph) => `<button type="button" aria-pressed="${ph === chosen}" data-ph="${esc(ph)}"><img src="${esc(photo(ph))}" alt="" loading="lazy"></button>`).join('')}</div></div></div></section>
       <section class="sec"><h3>Details</h3>
         <label class="field"><span>Name</span><input name="name" value="${esc(prod.name)}" maxlength="80" required></label>
-        <div class="row2"><label class="field"><span>Category</span><select name="cat">${catOpts}</select></label><label class="field"><span>Label</span><select name="tag"><option value="">None</option><option ${prod.tag === 'New' ? 'selected' : ''}>New</option><option ${prod.tag === 'Bestseller' ? 'selected' : ''}>Bestseller</option></select></label></div>
+        <div class="row2"><label class="field"><span>Category</span><select name="cat">${catOpts}</select></label><label class="field"><span>Label</span><select name="tag">${labOpts}</select></label></div>
+        <div class="row2"><label class="field" id="newcat-f" hidden><span>New category name</span><input id="newcat" maxlength="28" placeholder="e.g. Co-ord sets"></label><label class="field" id="newlab-f" hidden><span>New label name</span><input id="newlab" maxlength="18" placeholder="e.g. Limited"></label></div>
         <div class="row2"><label class="field"><span>Price (₹)</span><input name="price" type="number" inputmode="numeric" min="1" value="${esc(prod.price)}" required></label><label class="field"><span>Compare-at (₹)</span><input name="was" type="number" inputmode="numeric" min="1" value="${esc(prod.was ?? '')}" placeholder="Optional"></label></div>
         <label class="field"><span>Description</span><textarea name="blurb" maxlength="600">${esc(prod.blurb)}</textarea></label>
         <label class="field"><span>Details, one per line</span><textarea name="details" maxlength="800">${esc((prod.details || []).join('\n'))}</textarea></label></section>
       <section class="sec"><h3>Stock by size</h3><div class="row5">${SIZES.map((s) => `<label class="field"><span>${s}</span><input name="stock-${s}" type="number" inputmode="numeric" min="0" max="9999" value="${prod.stock?.[s] ?? 0}"></label>`).join('')}</div></section>
-      <section class="sec"><h3>Colours</h3><div class="colors" id="pcolors">${(prod.colors || []).map(colorRow).join('')}</div><div><button type="button" class="btn btn--sm" id="padd-color">+ Add colour</button></div></section>
+      <section class="sec"><h3>Colours</h3><div class="colors" id="pcolors">${(prod.colors || []).map(colorRow).join('')}</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn--sm" id="padd-color">+ Add colour</button><button type="button" class="btn btn--sm" id="psuggest">${ICON.eye} Suggest from photo</button></div><div class="sugs" id="psugs" hidden></div><p class="hint">Tap the ${'eyedropper'} on a colour, then tap the dress in the photo to copy its exact colour.</p></section>
       <section class="sec"><label class="switch"><input type="checkbox" name="active" ${prod.active === false ? '' : 'checked'}><i></i><span>Visible in the store</span></label></section>
       <p class="auth__err" id="perr" role="alert"></p>
     </form>`;
   openPanel(isNew ? (preset.copy ? 'Duplicate piece' : 'New piece') : prod.name, body, `${isNew ? '' : '<button class="btn btn--danger" id="pdel" type="button" style="margin-right:auto;flex:0 0 auto">Delete</button><button class="btn" id="pdup" type="button">Duplicate</button>'}<button class="btn btn--ink" id="psave" type="button">${isNew ? 'Add piece' : 'Save changes'}</button>`);
   const setPhoto = (src) => { chosen = src; const im = $('#pprev'); im.src = photo(src); im.hidden = !src; $$('#ppick button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ph === src))); };
   $$('#ppick button').forEach((b) => b.addEventListener('click', () => setPhoto(b.dataset.ph)));
-  $('#pfile').addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; try { setPhoto(await shrink(f)); } catch (err) { toast(err.message, { err: true }); } });
+  $('#pfile').addEventListener('change', async (e) => { const f = e.target.files[0]; if (!f) return; const btn = e.target.closest('label'); btn?.classList.add('is-busy'); try { setPhoto(await uploadImage(f)); toast('Photo added'); } catch (err) { toast(err.message, { err: true }); } btn?.classList.remove('is-busy'); });
   $('#padd-color').addEventListener('click', () => $('#pcolors').insertAdjacentHTML('beforeend', colorRow()));
-  $('#pcolors').addEventListener('click', (e) => { if (e.target.closest('[data-rm]')) e.target.closest('.c').remove(); });
+  $('#pcolors').addEventListener('click', guard(async (e) => {
+    if (e.target.closest('[data-rm]')) { e.target.closest('.c').remove(); return; }
+    const eye = e.target.closest('[data-eye]'); if (!eye) return;
+    if (!chosen) { toast('Add a photo first', { err: true }); return; }
+    const hex = await pickFromPhoto(photo(chosen)); if (!hex) return;
+    const row = eye.closest('.c'), nm = $('input[type=text]', row); $('input[type=color]', row).value = hex; if (!nm.value.trim()) nm.value = nameColor(hex);
+  }));
+  $('#psuggest').addEventListener('click', guard(async () => {
+    if (!chosen) { toast('Add a photo first', { err: true }); return; }
+    const hexes = await suggestColors(photo(chosen)), box = $('#psugs');
+    box.hidden = false; box.innerHTML = hexes.map((h) => `<button type="button" data-h="${h}" style="background:${h}" title="${nameColor(h)} ${h}" aria-label="Add ${nameColor(h)}"></button>`).join('') + '<span class="hint">Tap a colour to add it</span>';
+  }));
+  $('#psugs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-h]'); if (!b) return;
+    $('#pcolors').insertAdjacentHTML('beforeend', colorRow({ name: nameColor(b.dataset.h), hex: b.dataset.h })); b.remove();
+  });
+  const toggleNew = () => { $('#newcat-f').hidden = $('[name=cat]').value !== '__new'; $('#newlab-f').hidden = $('[name=tag]').value !== '__new'; };
+  $('[name=cat]').addEventListener('change', () => { toggleNew(); if (!$('#newcat-f').hidden) $('#newcat').focus(); });
+  $('[name=tag]').addEventListener('change', () => { toggleNew(); if (!$('#newlab-f').hidden) $('#newlab').focus(); });
   $('#psave').addEventListener('click', guard(async () => {
     const f = $('#pform'), fd = new FormData(f), v = (k) => fd.get(k);
+    $('#perr').textContent = '';
+    let cat = v('cat'), tag = v('tag') || '';
+    try {
+      if (cat === '__new') {                                         // make the new category first
+        const nm = $('#newcat').value.trim(); if (!nm) throw new Error('Type a name for the new category.');
+        const r = await api('categories', { method: 'PUT', body: { categories: [...productsCache.categories.filter((c) => c.id !== 'all'), { name: nm, blurb: '' }] } });
+        productsCache.categories = r.categories; cat = r.categories.at(-1).id;
+      }
+      if (tag === '__new') {
+        const nm = $('#newlab').value.trim(); if (!nm) throw new Error('Type a name for the new label.');
+        const { settings } = await api('settings', { method: 'PUT', body: { labels: [...(productsCache.labels || []), { name: nm, color: '' }] } });
+        productsCache.labels = settings.labels; tag = settings.labels.find((l) => l.name.toLowerCase() === nm.toLowerCase())?.name || nm;
+      }
+    } catch (err) { $('#perr').textContent = err.message; if (err.status === 401) throw err; return; }
     const payload = {
-      name: v('name'), cat: v('cat'), tag: v('tag') || '', price: v('price'), was: v('was'), blurb: v('blurb'), photo: chosen,
+      name: v('name'), cat, tag, price: v('price'), was: v('was'), blurb: v('blurb'), photo: chosen,
       details: String(v('details')).split('\n'), active: f.active.checked,
       stock: Object.fromEntries(SIZES.map((s) => [s, v('stock-' + s)])),
       colors: $$('#pcolors .c').map((r) => ({ hex: $('input[type=color]', r).value, name: $('input[type=text]', r).value.trim() })),
     };
-    $('#perr').textContent = ''; const btn = $('#psave'); btn.disabled = true;
+    const btn = $('#psave'); btn.disabled = true;
     try {
       await api(isNew ? 'products' : 'products/' + encodeURIComponent(p.id), { method: isNew ? 'POST' : 'PUT', body: payload });
       toast(isNew ? 'Piece added' : 'Saved'); closePanel(); if (route === 'products') render();
@@ -489,21 +628,23 @@ function openProduct(p, preset = {}) {
   }));
 }
 
-function shrink(file) {
+function shrink(file, max = 1400) {
   return new Promise((res, rej) => {
     if (!file.type.startsWith('image/')) return rej(new Error('Choose an image file'));
     const url = URL.createObjectURL(file), im = new Image();
     im.onload = () => {
-      const max = 900, k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas');
+      const k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas');
       c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
       c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
-      for (const q of [0.82, 0.7, 0.58, 0.46]) { const d = c.toDataURL('image/jpeg', q); if (d.length < 390000) return res(d); }
+      for (const q of [0.84, 0.74, 0.62, 0.5, 0.4]) { const d = c.toDataURL('image/jpeg', q); if (d.length < 850000) return res(d); }
       rej(new Error('That photo is too detailed. Try a smaller one.'));
     };
     im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not read that image')); };
     im.src = url;
   });
 }
+/** Resize in the browser, store it on the server and get back a short /api/img/… link. */
+async function uploadImage(file) { const { url } = await api('image', { method: 'POST', body: { data: await shrink(file) } }); return url; }
 
 /* ---------- inventory (every size at a glance, edit in place) ---------- */
 async function viewInventory() {
@@ -626,6 +767,8 @@ async function viewContent() {
   els.view.innerHTML = `<div id="cmsroot" style="display:grid;gap:18px"><p class="hint">Edit the words on your store. Changes go live as soon as you save. Clear a box or tap Reset to bring the original text back.</p>
     ${groups.map((g, gi) => `<details class="grp" data-g="${g.id}" ${gi === 0 ? 'open' : ''}><summary><div><b>${esc(g.name)}</b><small>${esc(g.hint)}</small></div><span class="dot" hidden></span></summary><div class="grp__b">
       ${schema.filter((f) => f.group === g.id).map((f) => {
+        if (f.kind === 'image') return `<div class="field" data-k="${esc(f.key)}"><div class="fhead"><span class="lbl">${esc(f.label)}</span><button type="button" data-reset="${esc(f.key)}">Reset</button></div>
+          <div class="imgf"><img data-prev="${esc(f.key)}" src="${esc(photo(cur[f.key]))}" alt=""><div class="imgf__btns"><label class="btn btn--sm">Upload photo<input type="file" accept="image/*" hidden data-up="${esc(f.key)}"></label><button class="btn btn--sm" type="button" data-pick="${esc(f.key)}">Choose from library</button></div></div></div>`;
         const big = ['long', 'lines', 'title', 'head'].includes(f.kind), rows = f.kind === 'long' ? 3 : f.kind === 'lines' ? 4 : 2;
         return `<div class="field" data-k="${esc(f.key)}"><div class="fhead"><span class="lbl">${esc(f.label)}</span><button type="button" data-reset="${esc(f.key)}">Reset</button></div>
           ${big ? `<textarea data-key="${esc(f.key)}" rows="${rows}" style="min-height:0" placeholder="${esc(f.def || '(empty)')}">${esc(cur[f.key])}</textarea>` : `<input data-key="${esc(f.key)}" value="${esc(cur[f.key])}" placeholder="${esc(f.def || '(empty)')}" ${f.kind === 'url' ? 'inputmode="url"' : f.kind === 'phone' ? 'inputmode="tel"' : ''}>`}
@@ -650,8 +793,26 @@ async function viewContent() {
   root.addEventListener('input', (e) => { const k = e.target.dataset.key; if (!k) return; cur[k] = e.target.value; mark(); });
   root.addEventListener('click', (e) => {
     const r = e.target.closest('[data-reset]'); if (!r) return;
-    const f = schema.find((x) => x.key === r.dataset.reset); cur[f.key] = f.def; $(`[data-key="${CSS.escape(f.key)}"]`).value = f.def; mark();
+    const f = schema.find((x) => x.key === r.dataset.reset); cur[f.key] = f.def;
+    if (f.kind === 'image') $(`[data-prev="${CSS.escape(f.key)}"]`).src = photo(f.def); else $(`[data-key="${CSS.escape(f.key)}"]`).value = f.def;
+    mark();
   });
+  const setImg = (key, url) => { cur[key] = url; $(`[data-prev="${CSS.escape(key)}"]`).src = photo(url); mark(); };
+  root.addEventListener('change', guard(async (e) => {
+    const inp = e.target.closest('[data-up]'); if (!inp || !inp.files[0]) return;
+    const lab = inp.closest('label'); lab.classList.add('is-busy');
+    try { setImg(inp.dataset.up, await uploadImage(inp.files[0])); toast('Photo added. Press Publish to show it.'); } finally { lab.classList.remove('is-busy'); inp.value = ''; }
+  }));
+  root.addEventListener('click', guard(async (e) => {
+    const b = e.target.closest('[data-pick]'); if (!b) return;
+    const key = b.dataset.pick;
+    const [{ products }, { images }] = await Promise.all([api('products'), api('image')]);
+    const site = [...new Set([...products.map((x) => x.photo), 'img/boutique.webp', 'img/model-noir.webp', 'img/knit-rust.webp', ...schema.filter((x) => x.kind === 'image').map((x) => x.def)])].filter((x) => x && !x.startsWith('data:'));
+    const up = images.map((i) => i.url);
+    const grid = (list) => `<div class="lib">${list.map((u) => `<button type="button" data-u="${esc(u)}" aria-label="Use this photo"><img src="${esc(photo(u))}" alt="" loading="lazy"></button>`).join('')}</div>`;
+    openPanel('Choose a photo', `${up.length ? `<section class="sec"><h3>Uploaded by you</h3>${grid(up)}</section>` : ''}<section class="sec"><h3>Site photos</h3>${grid(site)}</section>`);
+    $('#panel-body').onclick = (ev) => { const u = ev.target.closest('[data-u]'); if (!u) return; setImg(key, u.dataset.u); closePanel(); };
+  }));
   mark();
 }
 

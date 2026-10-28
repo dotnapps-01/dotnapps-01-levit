@@ -3,7 +3,8 @@
  * field in the dashboard brings the default back.
  *
  * kinds: text (one line) · title (lines; *word* becomes italic) · long (paragraph) · lines (one item per line) ·
- *        head (two lines: the second is italic) · url (link) · phone (digits for WhatsApp / tel links)        */
+ *        head (two lines: the second is italic) · url (link) · phone (digits for WhatsApp / tel links) ·
+ *        image (a site photo path like img/p/x.webp, or an uploaded one at /api/img/<id>)                    */
 import { db } from './db.js';
 
 export const GROUPS = [
@@ -26,13 +27,21 @@ export const SCHEMA = [
   T('hero', 'hero.intro', 'Intro text (desktop)', 'long', 'Swipe through eight looks from our boutique, save the ones you love, shop in one tap.'),
   T('hero', 'hero.home', 'Closing headline', 'head', 'Soft structure,\nevery day.'),
   T('hero', 'head.ruby-ruffle-dress', 'Look 1 · Ruby Ruffle Dress', 'head', 'Dressed in\ndeep red.'),
+  T('hero', 'hero.img.ruby-ruffle-dress', 'Look 1 photo', 'image', 'img/p/ruby-ruffle-dress.webp'),
   T('hero', 'head.smocked-bow-top', 'Look 2 · Smocked Bow Top', 'head', 'Tied up,\nnever tied down.'),
+  T('hero', 'hero.img.smocked-bow-top', 'Look 2 photo', 'image', 'img/p/smocked-bow-top.webp'),
   T('hero', 'head.black-bell-sleeve-kurta', 'Look 3 · Black Bell-Sleeve Kurta', 'head', 'Quiet black,\nwide sleeves.'),
+  T('hero', 'hero.img.black-bell-sleeve-kurta', 'Look 3 photo', 'image', 'img/p/black-bell-sleeve-kurta.webp'),
   T('hero', 'head.tissue-dupatta-kurta', 'Look 4 · Tissue Dupatta Kurta', 'head', 'White and gold,\nwith a little drape.'),
+  T('hero', 'hero.img.tissue-dupatta-kurta', 'Look 4 photo', 'image', 'img/p/tissue-dupatta-kurta.webp'),
   T('hero', 'head.red-polka-midi', 'Look 5 · Red Polka Midi', 'head', 'Polka dots,\nall dressed up.'),
+  T('hero', 'hero.img.red-polka-midi', 'Look 5 photo', 'image', 'img/p/red-polka-midi.webp'),
   T('hero', 'head.lace-crochet-top', 'Look 6 · Lace Crochet Top', 'head', 'Lace that\nfeels like air.'),
+  T('hero', 'hero.img.lace-crochet-top', 'Look 6 photo', 'image', 'img/p/lace-crochet-top.webp'),
   T('hero', 'head.navy-zip-jacket', 'Look 7 · Navy Zip Jacket', 'head', 'Zip up,\nstep out.'),
+  T('hero', 'hero.img.navy-zip-jacket', 'Look 7 photo', 'image', 'img/p/navy-zip-jacket.webp'),
   T('hero', 'head.ruby-cape-dress', 'Look 8 · Ruby Cape Dress', 'head', 'Cape sleeves,\nmain character.'),
+  T('hero', 'hero.img.ruby-cape-dress', 'Look 8 photo', 'image', 'img/p/ruby-cape-dress.webp'),
 
   T('sections', 'collections.eyebrow', 'Collections · small line', 'text', 'Shop by category'),
   T('sections', 'collections.title', 'Collections · title', 'title', 'Five ways to\n*wear light.*'),
@@ -42,12 +51,14 @@ export const SCHEMA = [
   T('sections', 'dresses.title', 'Dress edit · title', 'title', 'Dressed for *the moment*'),
   T('sections', 'dresses.sub', 'Dress edit · sub line', 'text', 'Ruffles, polka dots, capes and embroidery'),
 
+  T('story', 'story.image', 'Photo', 'image', 'img/model-noir.webp'),
   T('story', 'story.eyebrow', 'Small line', 'text', 'The idea'),
   T('story', 'story.title', 'Title', 'title', 'Quietly bold.\n*Never loud.*'),
   T('story', 'story.lead', 'Opening paragraph', 'long', 'LEVIT began with a simple question: why does getting dressed feel so heavy? We make clothes that sit lightly — in the fabric, in the fit, and on your day.'),
   T('story', 'story.body', 'Second paragraph', 'long', 'Texture over noise. Warm neutrals that go with everything you already own. Cuts that flatter without fussing. Every piece is designed in-house and tested on real women, in real light, on real stairs.'),
   T('story', 'story.quote', 'Quote', 'long', "Dress like you've nothing to prove, and everything to enjoy."),
 
+  T('craft', 'craft.image', 'Round photo', 'image', 'img/p/ruby-ruffle-dress.webp'),
   T('craft', 'craft.eyebrow', 'Small line', 'text', 'Made to be lived in'),
   T('craft', 'craft.title', 'Title', 'title', 'Soft by nature.\n*Structured by design.*'),
   T('craft', 'craft.p1.title', 'Pillar 1 · title', 'text', 'Feel'),
@@ -60,6 +71,7 @@ export const SCHEMA = [
   T('craft', 'perk.2', 'Promise 2', 'text', '7-day easy exchange'),
   T('craft', 'perk.3', 'Promise 3', 'text', 'Cash on delivery'),
 
+  T('boutique', 'boutique.image', 'Photo', 'image', 'img/boutique.webp'),
   T('boutique', 'boutique.eyebrow', 'Small line', 'text', 'In person'),
   T('boutique', 'boutique.title', 'Title', 'title', 'Come say\n*hello.*'),
   T('boutique', 'boutique.lead', 'Text', 'long', "Our boutique is the quietest way to meet the collection: racks you can touch, fabrics you can feel, and a stylist who won't hover."),
@@ -88,6 +100,7 @@ function clean(f, raw) {
   let v = String(raw ?? '').replace(/\r/g, '').trim();
   if (f.kind === 'text' || f.kind === 'phone' || f.kind === 'url') v = v.replace(/\n+/g, ' ');
   if (f.kind === 'phone') v = v.replace(/[^0-9+]/g, '');
+  if (f.kind === 'image') return /^(img\/[A-Za-z0-9_\-./]+|\/api\/img\/[a-f0-9]{12})$/.test(v) && !v.includes('..') ? v : '';
   if (f.kind === 'url' && v && !/^https?:\/\//i.test(v)) v = /^[\w.-]+\.[a-z]{2,}/i.test(v) ? 'https://' + v : '';
   if (f.kind === 'lines') v = v.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, f.max || 6).join('\n');
   if (f.kind === 'head' || f.kind === 'title') v = v.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 3).join('\n');

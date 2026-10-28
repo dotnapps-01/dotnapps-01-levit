@@ -16,9 +16,10 @@ import { db, persistent, storage } from './_lib/db.js';
 import { checkPassword, sessionCookie, clearCookie, isAdmin, configured, usingDefaultPassword, throttled, noteFailure } from './_lib/auth.js';
 import {
   publicCatalog, createOrder, allOrders, updateOrder, allProducts, createProduct, updateProduct, deleteProduct, reorderProducts, setStock,
-  getSettings, saveSettings, overview, customersFrom, checkCoupon, activity, backup, logAct, CATEGORIES, STATUSES, SIZES,
+  getSettings, saveSettings, overview, customersFrom, checkCoupon, activity, backup, logAct, getCategories, saveCategories, STATUSES, SIZES,
 } from './_lib/logic.js';
 import { SCHEMA, GROUPS, getContent, saveContent } from './_lib/content.js';
+import { saveImage, getImage, listImages } from './_lib/images.js';
 
 const send = (res, status, body, headers = {}) => {
   res.statusCode = status;
@@ -59,6 +60,12 @@ export default async function handler(req, res) {
       if (r.error) return send(res, r.status, { error: r.error });
       return send(res, 201, { ok: true, id: r.order.id, total: r.order.total });
     }
+    if (parts[0] === 'img' && method === 'GET') {
+      const im = await getImage(parts[1] || '');
+      if (!im) return send(res, 404, { error: 'Not found' });
+      res.statusCode = 200; res.setHeader('Content-Type', im.t); res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.end(Buffer.from(im.d, 'base64'));
+    }
     if (parts[0] === 'coupon' && method === 'GET') {
       const r = await checkCoupon(url.searchParams.get('code'), url.searchParams.get('sub'));
       return send(res, 200, r);
@@ -92,6 +99,14 @@ export default async function handler(req, res) {
       const o = await allOrders();
       return send(res, 200, { new: o.filter((x) => x.status === 'new').length, total: o.length, latest: o[0] ? { id: o[0].id, name: o[0].customer.name, total: o[0].total, at: o[0].createdAt } : null });
     }
+    if (route === 'categories') {
+      if (method === 'GET') return send(res, 200, { categories: await getCategories() });
+      if (method === 'PUT') { const r = await saveCategories((await readJson(req)).categories); if (r.error) return send(res, 422, { error: r.error }); return send(res, 200, r); }
+    }
+    if (route === 'image') {
+      if (method === 'POST') { const r = await saveImage((await readJson(req)).data); if (r.error) return send(res, 422, { error: r.error }); return send(res, 201, { url: r.url }); }
+      if (method === 'GET') return send(res, 200, { images: await listImages() });
+    }
     if (route === 'activity' && method === 'GET') return send(res, 200, { activity: await activity(60) });
     if (route === 'backup' && method === 'GET') return send(res, 200, await backup(), { 'Content-Disposition': `attachment; filename="levit-backup-${new Date().toISOString().slice(0, 10)}.json"` });
     if (route === 'content') {
@@ -113,7 +128,7 @@ export default async function handler(req, res) {
     }
 
     if (route === 'products') {
-      if (method === 'GET') return send(res, 200, { products: await allProducts(), categories: CATEGORIES, sizes: SIZES });
+      if (method === 'GET') { const [products, categories, st] = await Promise.all([allProducts(), getCategories(), getSettings()]); return send(res, 200, { products, categories, labels: st.labels, sizes: SIZES }); }
       if (method === 'POST' && parts[2] === 'reorder') { await reorderProducts((await readJson(req)).ids); return send(res, 200, { ok: true }); }
       if (method === 'POST') {
         const r = await createProduct(await readJson(req));

@@ -5,7 +5,7 @@ import { getContent } from './content.js';
 
 export const SIZES = ['XS', 'S', 'M', 'L', 'XL'];
 export const STATUSES = ['new', 'packed', 'shipped', 'delivered', 'cancelled'];
-export const CATEGORIES = seed.categories;
+export const DEFAULT_CATEGORIES = seed.categories;
 
 const DEFAULT_SETTINGS = {
   storeName: 'LEVIT',
@@ -13,10 +13,11 @@ const DEFAULT_SETTINGS = {
   paused: false, pauseMessage: 'We are taking a short break from orders. Please check back soon.',
   offer: { code: 'LEVIT10', pct: 10, active: true, delay: 9 },
   coupons: [],
+  labels: [{ name: 'New', color: '' }, { name: 'Bestseller', color: '' }],
 };
 export async function getSettings() {
   const s = (await db.get('levit:settings')) || {};
-  return { ...DEFAULT_SETTINGS, ...s, offer: { ...DEFAULT_SETTINGS.offer, ...(s.offer || {}) }, coupons: Array.isArray(s.coupons) ? s.coupons : [] };
+  return { ...DEFAULT_SETTINGS, ...s, offer: { ...DEFAULT_SETTINGS.offer, ...(s.offer || {}) }, coupons: Array.isArray(s.coupons) ? s.coupons : [], labels: Array.isArray(s.labels) ? s.labels : DEFAULT_SETTINGS.labels };
 }
 
 const int = (v, d, lo = 0, hi = 1e7) => { const x = Math.round(Number(v)); return Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : d; };
@@ -38,6 +39,17 @@ function cleanCoupons(list, welcome) {
   return out;
 }
 
+function cleanLabels(list) {
+  const seen = new Set(), out = [];
+  for (const l of Array.isArray(list) ? list.slice(0, 16) : []) {
+    const name = String(l?.name ?? l ?? '').replace(/\s+/g, ' ').trim().slice(0, 18);
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    out.push({ name, color: /^#[0-9a-f]{6}$/i.test(l?.color || '') ? l.color.toLowerCase() : '' });
+  }
+  return out;
+}
+
 export async function saveSettings(input) {
   const cur = await getSettings();
   const o = input.offer || {};
@@ -54,6 +66,7 @@ export async function saveSettings(input) {
     pauseMessage: String(input.pauseMessage ?? cur.pauseMessage).slice(0, 200) || DEFAULT_SETTINGS.pauseMessage,
     offer,
     coupons: cleanCoupons(input.coupons === undefined ? cur.coupons : input.coupons, offer.code),
+    labels: input.labels === undefined ? cur.labels : cleanLabels(input.labels),
   };
   await db.set('levit:settings', next);
   return next;
@@ -72,6 +85,30 @@ export async function activity(limit = 40) {
   return Object.values(await db.hgetall('levit:log')).sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
 }
 
+/* ---------- categories ---------- */
+export async function getCategories() {
+  const c = await db.get('levit:categories');
+  return Array.isArray(c) && c.length ? c : DEFAULT_CATEGORIES.map((x) => ({ ...x }));
+}
+/** list: [{ id?, name, blurb }]. A category that still holds pieces can not be removed. */
+export async function saveCategories(list) {
+  const prev = await getCategories(), used = new Set(), out = [];
+  const slug2 = (s) => String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24);
+  for (const c of Array.isArray(list) ? list.slice(0, 24) : []) {
+    const name = String(c.name || '').replace(/\s+/g, ' ').trim().slice(0, 28);
+    if (!name) continue;
+    let id = prev.some((p) => p.id === c.id) ? c.id : slug2(name) || 'category', n = 2;
+    while (used.has(id) || (!prev.some((p) => p.id === id && p.id === c.id) && prev.some((p) => p.id === id))) id = `${slug2(name) || 'category'}-${n++}`;
+    used.add(id); out.push({ id, name, blurb: String(c.blurb || '').trim().slice(0, 120) });
+  }
+  if (!out.length) return { error: 'Keep at least one category.' };
+  const products = await allProducts();
+  for (const p of products) if (!out.some((c) => c.id === p.cat)) return { error: `"${prev.find((c) => c.id === p.cat)?.name || p.cat}" still has pieces. Move or delete them first.` };
+  await db.set('levit:categories', out);
+  await logAct('Edited categories');
+  return { categories: out };
+}
+
 /* ---------- products ---------- */
 export async function allProducts() {
   let h = await db.hgetall('levit:products');
@@ -85,7 +122,7 @@ export async function allProducts() {
 const slug = (s) => String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
 const money = (v) => { const x = Math.round(Number(v)); return Number.isFinite(x) && x >= 0 ? x : null; };
 
-export function cleanProduct(input, prev = {}) {
+export function cleanProduct(input, prev = {}, cats = DEFAULT_CATEGORIES, labels = []) {
   const errs = [];
   const name = String(input.name ?? prev.name ?? '').trim().slice(0, 80);
   if (!name) errs.push('Name is required');
@@ -93,10 +130,10 @@ export function cleanProduct(input, prev = {}) {
   if (price === null || price < 1) errs.push('Price must be a number above 0');
   const was = input.was === '' || input.was == null ? (input.was === undefined ? prev.was ?? null : null) : money(input.was);
   if (was !== null && price !== null && was <= price) errs.push('Compare-at price must be higher than the price');
-  const cat = CATEGORIES.some((c) => c.id === input.cat) ? input.cat : prev.cat;
+  const cat = cats.some((c) => c.id === input.cat) ? input.cat : cats.some((c) => c.id === prev.cat) ? prev.cat : undefined;
   if (!cat) errs.push('Pick a category');
   const photo = String(input.photo ?? prev.photo ?? '');
-  if (!photo || !(photo.startsWith('img/') || photo.startsWith('data:image/'))) errs.push('Add a photo');
+  if (!photo || !(/^img\/[\w\-./]+$/.test(photo) || /^\/api\/img\/[a-f0-9]{12}$/.test(photo) || photo.startsWith('data:image/'))) errs.push('Add a photo');
   if (photo.length > 400000) errs.push('Photo is too large');
   const stock = Object.fromEntries(SIZES.map((s) => [s, Math.max(0, Math.min(9999, Math.round(Number((input.stock || prev.stock || {})[s]) || 0)))]));
   const colors = (Array.isArray(input.colors) ? input.colors : prev.colors || [{ name: 'Default', hex: '#cdb494' }])
@@ -104,7 +141,7 @@ export function cleanProduct(input, prev = {}) {
   if (!colors.length) colors.push({ name: 'Default', hex: '#cdb494' });
   const out = {
     ...prev, name, price, was, cat, photo, stock, colors,
-    tag: ['New', 'Bestseller'].includes(input.tag) ? input.tag : input.tag === '' || input.tag === null ? null : prev.tag ?? null,
+    tag: input.tag === undefined ? (prev.tag ?? null) : labels.some((l) => l.name === input.tag) ? input.tag : null,
     blurb: String(input.blurb ?? prev.blurb ?? '').slice(0, 600),
     details: (Array.isArray(input.details) ? input.details : prev.details || []).map((d) => String(d).trim().slice(0, 120)).filter(Boolean).slice(0, 8),
     bg: /^#[0-9a-f]{6}$/i.test(input.bg) ? input.bg : prev.bg || '#F1D2B6',
@@ -116,7 +153,8 @@ export function cleanProduct(input, prev = {}) {
 
 export async function createProduct(input) {
   const list = await allProducts();
-  const { errs, product } = cleanProduct(input);
+  const [cats, st] = await Promise.all([getCategories(), getSettings()]);
+  const { errs, product } = cleanProduct(input, {}, cats, st.labels);
   if (errs.length) return { errs };
   let id = slug(product.name) || 'piece', n = 2;
   while (list.some((p) => p.id === id)) id = `${slug(product.name)}-${n++}`;
@@ -128,7 +166,8 @@ export async function createProduct(input) {
 export async function updateProduct(id, input) {
   const prev = await db.hget('levit:products', id);
   if (!prev) return { notFound: true };
-  const { errs, product } = cleanProduct(input, prev);
+  const [cats, st] = await Promise.all([getCategories(), getSettings()]);
+  const { errs, product } = cleanProduct(input, prev, cats, st.labels);
   if (errs.length) return { errs };
   product.id = id;
   await db.hset('levit:products', id, product);
@@ -158,11 +197,11 @@ export async function setStock(updates) {
 }
 
 export async function publicCatalog() {
-  const [products, settings, content] = await Promise.all([allProducts(), getSettings(), getContent()]);
+  const [products, settings, content, categories] = await Promise.all([allProducts(), getSettings(), getContent(), getCategories()]);
   return {
     products: products.filter((p) => p.active !== false),
-    categories: CATEGORIES,
-    settings: { freeShip: settings.freeShip, shipFee: settings.shipFee, codFee: settings.codFee, offer: settings.offer, paused: settings.paused, pauseMessage: settings.pauseMessage },
+    categories,
+    settings: { freeShip: settings.freeShip, shipFee: settings.shipFee, codFee: settings.codFee, offer: settings.offer, paused: settings.paused, pauseMessage: settings.pauseMessage, labels: settings.labels },
     content,
   };
 }
@@ -292,7 +331,7 @@ export function customersFrom(orders) {
 
 export async function overview(days = 14) {
   days = [7, 14, 30, 90].includes(days) ? days : 14;
-  const [orders, products, stats, settings] = await Promise.all([allOrders(), allProducts(), db.hgetall('levit:stats'), getSettings()]);
+  const [orders, products, stats, settings, categories] = await Promise.all([allOrders(), allProducts(), db.hgetall('levit:stats'), getSettings(), getCategories()]);
   const live = orders.filter((o) => o.status !== 'cancelled');
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const since = new Date(today); since.setDate(since.getDate() - (days - 1));
@@ -310,7 +349,7 @@ export async function overview(days = 14) {
   const top = {}, cats = {};
   for (const o of inWin) for (const l of o.lines) {
     const t = (top[l.id] ||= { id: l.id, name: l.name, photo: l.photo, units: 0, revenue: 0 }); t.units += l.qty; t.revenue += l.qty * l.price;
-    const cid = catOf[l.id] || 'other'; const ct = (cats[cid] ||= { id: cid, name: CATEGORIES.find((c) => c.id === cid)?.name || 'Other', units: 0, revenue: 0 }); ct.units += l.qty; ct.revenue += l.qty * l.price;
+    const cid = catOf[l.id] || 'other'; const ct = (cats[cid] ||= { id: cid, name: categories.find((c) => c.id === cid)?.name || 'Other', units: 0, revenue: 0 }); ct.units += l.qty; ct.revenue += l.qty * l.price;
   }
   const pay = { upi: { orders: 0, revenue: 0 }, card: { orders: 0, revenue: 0 }, cod: { orders: 0, revenue: 0 } };
   for (const o of inWin) { const p = pay[o.pay] || (pay[o.pay] = { orders: 0, revenue: 0 }); p.orders++; p.revenue += o.total; }

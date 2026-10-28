@@ -184,7 +184,7 @@ input[type=checkbox] { width: 22px; height: 22px; min-height: 0; padding: 0; acc
 @media (max-width: 400px) { .row2 { grid-template-columns: 1fr; } }
 .photo { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: start; } .photo img { width: 96px; height: 128px; object-fit: cover; object-position: 50% 22%; border-radius: 10px; background: var(--sand); }
 .picker { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0; scrollbar-width: thin; } .picker button { flex: none; width: 50px; height: 66px; border-radius: 8px; overflow: hidden; border: 2px solid transparent; } .picker button[aria-pressed="true"] { border-color: var(--ink); } .picker img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; }
-.colors { display: grid; gap: 8px; } .colors .c { display: grid; grid-template-columns: 48px 1fr 44px; gap: 8px; align-items: center; } .colors input[type=color] { padding: 3px; min-height: 48px; }
+.colors { display: grid; gap: 8px; } .colors .c { display: grid; grid-template-columns: 48px 1fr 44px 44px; gap: 8px; align-items: center; } .colors input[type=color] { padding: 3px; min-height: 48px; }
 
 /* inventory + content editor */
 .inv { display: grid; gap: 0; } .inv__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); } .inv__row:last-child { border-bottom: 0; } .inv__row .meta { display: flex; gap: 12px; align-items: center; min-width: 0; } .inv__row .meta b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
@@ -214,3 +214,20 @@ input[type=checkbox] { width: 22px; height: 22px; min-height: 0; padding: 0; acc
 
 /* bars that stick to the bottom live in .view directly so position: sticky has room to work */
 #bulk, #cmsbar, #invbar { display: contents; }
+
+/* image fields in the content editor */
+.imgf { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; } .imgf img { width: 96px; height: 128px; object-fit: cover; object-position: 50% 22%; border-radius: 10px; background: var(--sand); }
+.imgf__btns { display: grid; gap: 8px; justify-items: start; }
+label.is-busy { opacity: .5; pointer-events: none; } label.is-busy::after { content: "…"; }
+.lib { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; } .lib button { aspect-ratio: 3 / 4; border-radius: 10px; overflow: hidden; border: 2px solid transparent; background: var(--sand); } .lib button:hover, .lib button:focus-visible { border-color: var(--ink); } .lib img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; }
+
+/* categories, labels, colour picking */
+.catlist { display: grid; gap: 10px; }
+.catrow { display: grid; gap: 8px; padding: 12px; background: #fff; border: 1px solid var(--line); border-radius: 14px; } .catrow__f { display: grid; gap: 8px; } .catrow__a { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.catrow .arrows, .labrow .arrows { display: flex; gap: 4px; } .catrow .arrows button { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: #fff; display: grid; place-items: center; } .catrow .arrows button:disabled { opacity: .3; }
+.labrow { display: grid; grid-template-columns: minmax(0, 1fr) auto 48px auto 44px; gap: 8px; align-items: center; padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 14px; } .labrow input[type=color] { padding: 3px; min-height: 46px; } .labrow input[type=color]:disabled { opacity: .3; } .labrow .switch { min-height: 0; }
+@media (max-width: 430px) { .labrow { grid-template-columns: minmax(0, 1fr) auto 44px 44px; } .labrow .hint { display: none; } }
+.sugs { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .sugs button { width: 46px; height: 46px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px var(--line), 0 2px 6px rgba(0, 0, 0, .15); }
+.pickbox { width: min(460px, 100%); max-height: 94dvh; overflow: auto; } .pickwrap { position: relative; line-height: 0; border-radius: 12px; overflow: hidden; touch-action: none; background: var(--sand); width: fit-content; margin-inline: auto; } .pickwrap canvas { display: block; cursor: crosshair; touch-action: none; }
+.pickdot { position: absolute; width: 28px; height: 28px; margin: -14px 0 0 -14px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1.5px #000, 0 4px 12px rgba(0, 0, 0, .4); pointer-events: none; }
+.pickread { display: flex; align-items: center; gap: 12px; } .pickchip { width: 40px; height: 40px; border-radius: 50%; background: #eee; box-shadow: inset 0 0 0 1px var(--line); flex: none; }

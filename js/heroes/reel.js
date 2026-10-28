@@ -14,6 +14,7 @@ const HEAD = {
 };
 const HOME = ['Soft structure,', 'every day.'];
 const cms = (k, d) => (window.__levitContent || {})[k] || d;
+const shot = (p) => cms('hero.img.' + p.id, p.photo);
 const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 const cmsLines = (k, d) => { const v = (window.__levitContent || {})[k]; return v ? v.split('\n').slice(0, 2).concat(['']).slice(0, 2) : d; };
 const headHTML = ([a, b]) => `<span class="rf__hl"><span>${a}</span></span><span class="rf__hl"><span><em>${b}</em></span></span>`;
@@ -29,7 +30,7 @@ export function mount(hero) {
     <div class="rf__col">
       <p class="rf__h rf__t" aria-hidden="true">${headHTML(cmsLines('head.' + set[0].id, HEAD[set[0].id] || HOME))}</p>
       <a class="rf__skip" href="#shop" data-skip><span>Skip to shop</span><i aria-hidden="true"></i></a>
-      <div class="rf__scroll" id="rf-scroll" tabindex="-1">${set.map((p, k) => `<section class="rf__s" data-i="${k}" aria-label="${p.name}"><img ${k < 2 ? `src="${p.photo}"` : `data-src="${p.photo}"`} alt="${p.name}" ${k > 0 ? 'fetchpriority="low" ' : 'fetchpriority="high" '}decoding="async" draggable="false">
+      <div class="rf__scroll" id="rf-scroll" tabindex="-1">${set.map((p, k) => `<section class="rf__s" data-i="${k}" aria-label="${p.name}"><img ${k < 2 ? `src="${shot(p)}"` : `data-src="${shot(p)}"`} alt="${p.name}" ${k > 0 ? 'fetchpriority="low" ' : 'fetchpriority="high" '}decoding="async" draggable="false">
         <div class="rf__shade"></div>
         <div class="rf__info"><p class="rf__no">${pad(k + 1)} / ${pad(set.length)}</p><h2>${p.name}</h2><div class="rf__row"><span>${inr(p.price)}</span><button class="rf__shop" type="button" data-quick="${p.id}">Shop this look</button></div></div>
         <button class="rf__heart" type="button" data-id="${p.id}" aria-pressed="false" aria-label="Save ${p.name}">${HEART}</button></section>`).join('')}
@@ -47,7 +48,7 @@ export function mount(hero) {
   });
   // desktop backdrop: two average colours per photo (top and bottom) as a gradient, instead of a live image blur
   if (matchMedia('(min-width: 900px)').matches) afterLoad(() => set.forEach((p, k) => {
-    const im = new Image(); im.src = p.photo;
+    const im = new Image(); im.src = shot(p);
     im.onload = () => {
       try {
         const cv = document.createElement('canvas'); cv.width = 4; cv.height = 8; const cx = cv.getContext('2d'); cx.drawImage(im, 0, 0, 4, 8);

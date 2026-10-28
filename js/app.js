@@ -42,6 +42,8 @@ const priceHTML = (p) => `${inr(p.price)}${p.was ? ` <s>${inr(p.was)}</s>` : ''}
 let FREE_SHIP = 1999, SHIP = 99, COD = 49;
 let live = false;                                  // true once /api/catalog answered: orders go to the dashboard
 let cfg = { offer: { code: 'LEVIT10', pct: 10, active: true, delay: 9 } };
+let LABELS = [];                                   // [{ name, color }] from the dashboard
+const tagStyle = (name) => { const c = LABELS.find((l) => l.name === name)?.color; if (!c) return ''; const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)); return ` style="background:${c};color:${(r * 299 + g * 587 + b * 114) / 1000 > 150 ? '#0B0907' : '#fff'}"`; };
 const stockOf = (p, size) => (p?.stock ? p.stock[size] ?? 0 : 9);        // static fallback data has no stock numbers
 const liveCats = () => CATEGORIES.filter((c) => PRODUCTS.some((p) => p.cat === c.id));
 
@@ -125,7 +127,7 @@ const heart = '<svg viewBox="0 0 24 24" width="20" height="20" stroke-width="1.5
 
 function cardHTML(p, i) {
   const sale = p.was ? Math.round((1 - p.price / p.was) * 100) : 0;
-  const tag = p.tag && !(sale && p.tag.startsWith('-')) ? `<span class="card__tag">${p.tag}</span>` : '';
+  const tag = p.tag && !(sale && p.tag.startsWith('-')) ? `<span class="card__tag"${tagStyle(p.tag)}>${esc(p.tag)}</span>` : '';
   return `<article class="card" data-id="${p.id}" data-reveal style="--i:${i % 8}">
     <div class="card__stage">
       <button class="card__media" style="--bg:${p.bg}" data-quick="${p.id}" aria-label="${p.name}, ${inr(p.price)}. Open details">
@@ -217,7 +219,7 @@ function openQuick(id) {
   const p = byId(id);
   if (!p) return;
   Q.id = id; Q.ci = colorOf[id] ?? 0; Q.size = null;
-  $('#q-cat').textContent = CATEGORIES.find((c) => c.id === p.cat).name;
+  $('#q-cat').textContent = CATEGORIES.find((c) => c.id === p.cat)?.name || '';
   $('#q-name').textContent = p.name;
   const sale = p.was ? Math.round((1 - p.price / p.was) * 100) : 0;
   $('#q-price').innerHTML = `${inr(p.price)}${p.was ? ` <s>${inr(p.was)}</s> <span class="off">−${sale}%</span>` : ''}`;
@@ -574,6 +576,7 @@ const fmt = (v) => esc(v).replace(/\*([^*\n]+)\*/g, '<em>$1</em>').replace(/\n/g
 const hrefFor = (kind, v) => (kind === 'wa' ? `https://wa.me/${v.replace(/\D/g, '')}` : kind === 'tel' ? `tel:${v.replace(/[^\d+]/g, '')}` : kind === 'mail' ? `mailto:${v}` : v);
 function applyContent(c) {
   $$('[data-cms]').forEach((el) => { const v = c[el.dataset.cms]; if (v) el.innerHTML = fmt(v); });
+  $$('[data-cms-img]').forEach((el) => { const v = c[el.dataset.cmsImg]; if (v) el.src = v; });
   $$('[data-cms-list]').forEach((el) => {
     const v = c[el.dataset.cmsList]; if (!v) return;
     const once = (hid) => v.split('\n').map((t) => `<span${hid ? ' aria-hidden="true"' : ''}>${esc(t)}</span><i${hid ? ' aria-hidden="true"' : ''}>✦</i>`).join('');
@@ -591,7 +594,7 @@ function applyCatalog(d) {
   if (!d || !Array.isArray(d.products) || !d.products.length) return false;
   PRODUCTS.splice(0, PRODUCTS.length, ...d.products.map((p) => ({ ...p, real: true })));
   CATEGORIES.splice(0, CATEGORIES.length, ...d.categories);
-  const c = d.settings; FREE_SHIP = c.freeShip; SHIP = c.shipFee; COD = c.codFee; cfg = c; live = true;
+  const c = d.settings; LABELS = c.labels || []; FREE_SHIP = c.freeShip; SHIP = c.shipFee; COD = c.codFee; cfg = c; live = true;
   bag = bag.filter((l) => byId(l.id)); wish = new Set([...wish].filter(byId));
   window.__levitContent = d.content || {}; applyContent(window.__levitContent);
   const pz = $('#paused'); if (pz) { pz.hidden = !c.paused; pz.textContent = c.paused ? c.pauseMessage : ''; }
@@ -625,7 +628,11 @@ async function revalidateOffer() {                         // a saved code the d
     if (!r.ok && !r.min) { const c = offer.code; offer = null; store.set('levit.offer', null); renderBag(); toast(`${c} is no longer valid`); }
   } catch { /* offline: keep it */ }
 }
-function refreshShop() { renderIndex(); renderChips(); renderGrid(); renderDresses(); renderBag(); updateCounts(); }
+function renderFoot() {
+  const nav = $('#foot-shop'); if (!nav) return;
+  nav.innerHTML = '<h3>Shop</h3>' + [{ id: 'all', name: 'All' }, ...liveCats()].map((c) => `<a href="shop.html?cat=${esc(c.id)}" data-filter="${esc(c.id)}">${esc(c.name)}</a>`).join('');
+}
+function refreshShop() { renderFoot(); renderIndex(); renderChips(); renderGrid(); renderDresses(); renderBag(); updateCounts(); }
 if (onShopPage) {
   const c = new URLSearchParams(location.search).get('cat');
   if (c && (c === 'saved' || CATEGORIES.some((x) => x.id === c))) filter = c;
