@@ -1,4 +1,4 @@
-/* One serverless function for the whole API (keeps well inside Vercel's function limits).
+/* One serverless function for the whole API (keeps well inside Vercel's function limits). vercel.json rewrites every /api/* request to it.
  *
  *   public   GET  /api/catalog          products + prices + offer settings for the storefront
  *            POST /api/orders           place an order (prices and stock are checked here)
@@ -37,7 +37,10 @@ async function readJson(req) {
 export default async function handler(req, res) {
   try {
     const url = new URL(req.url, 'http://localhost');
-    const parts = url.pathname.replace(/^\/api\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
+    // vercel.json rewrites /api/* to this function with the original path in ?__p=
+    const raw = url.searchParams.has('__p') ? url.searchParams.get('__p') : url.pathname.replace(/^\/api\/?/, '');
+    url.searchParams.delete('__p');
+    const parts = raw.split('/').filter(Boolean).map(decodeURIComponent);
     const method = req.method;
     const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
 
