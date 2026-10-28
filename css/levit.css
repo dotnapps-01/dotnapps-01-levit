@@ -632,3 +632,5 @@ input, select, textarea { font-size: max(16px, 1em); }
 
 /* sections below the shop are only laid out and painted when they approach the screen */
 .dresses, .story, .craft, .boutique, .join, .foot { content-visibility: auto; contain-intrinsic-size: auto 760px; }
+
+.done__note { color: var(--rust); font-size: .88rem; }

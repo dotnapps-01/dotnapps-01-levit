@@ -366,27 +366,35 @@ $('#co-form').addEventListener('submit', async (e) => {
   const btn = $('#co-submit');
   btn.disabled = true; btn.firstElementChild.textContent = 'Placing order…';
   const reset = () => { btn.disabled = false; btn.firstElementChild.textContent = 'Place order'; };
-  let id = 'LV-' + Math.floor(100000 + Math.random() * 900000);
-  if (live) {
-    try {
-      const r = await fetch('/api/orders', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer: { name: f.name.value.trim(), email: f.email.value.trim(), phone: f.phone.value.trim() },
-          address: { address: f.address.value.trim(), city: f.city.value.trim(), pin: f.pin.value.trim() },
-          pay: $('input[name="pay"]:checked').value, offerCode: offer?.code || '',
-          lines: bag.map((l) => ({ id: l.id, size: l.size, qty: l.qty })),
-        }),
-      });
-      const d = await r.json().catch(() => ({}));
+  let id = 'LV-' + Math.floor(100000 + Math.random() * 900000), demo = false;
+  /* Always try the real API. Only when there is no API at all (a static preview) is the order simulated. */
+  try {
+    const r = await fetch('/api/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: { name: f.name.value.trim(), email: f.email.value.trim(), phone: f.phone.value.trim() },
+        address: { address: f.address.value.trim(), city: f.city.value.trim(), pin: f.pin.value.trim() },
+        pay: $('input[name="pay"]:checked').value, offerCode: offer?.code || '',
+        lines: bag.map((l) => ({ id: l.id, size: l.size, qty: l.qty })),
+      }),
+    });
+    const d = await r.json().catch(() => null);
+    if (d && typeof d === 'object') {                                  // the API answered
+      live = true;
       if (!r.ok) {
         toast(d.error || 'We could not place your order. Please try again.');
         if (r.status === 409) { await syncCatalog(); refreshShop(); renderCheckoutSummary(); }
         reset(); return;
       }
       id = d.id;
-    } catch { toast('Connection problem. Please try again.'); reset(); return; }
-  } else await new Promise((r) => setTimeout(r, 900));
+    } else if (live) { toast('We could not reach the store. Please try again.'); reset(); return; }
+    else demo = true;
+  } catch {
+    if (live) { toast('Connection problem. Please try again.'); reset(); return; }
+    demo = true;
+  }
+  if (demo) await new Promise((r) => setTimeout(r, 900));
+  const note = $('#done-note'); if (note) { note.hidden = !demo; note.textContent = demo ? 'Demo only: this order was not sent to the store because no store backend is connected here.' : ''; }
   $('#done-name').textContent = ', ' + f.name.value.trim().split(' ')[0];
   $('#done-email').textContent = f.email.value.trim();
   $('#done-no').textContent = id;
