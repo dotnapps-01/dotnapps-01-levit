@@ -114,7 +114,7 @@ export default async function handler(req, res) {
       if (method === 'PUT') { const values = await saveContent(await readJson(req)); await logAct('Edited site content'); return send(res, 200, { values }); }
     }
     if (route === 'stock' && method === 'POST') return send(res, 200, { updated: await setStock((await readJson(req)).updates) });
-    if (route === 'overview' && method === 'GET') return send(res, 200, { ...(await overview(Number(url.searchParams.get('days')) || 14)), persistent });
+    if (route === 'overview' && method === 'GET') return send(res, 200, { ...(await overview(Number(url.searchParams.get('days')) || 14, url.searchParams.get('from') || '', url.searchParams.get('to') || '')), persistent });
     if (route === 'customers' && method === 'GET') return send(res, 200, { customers: customersFrom(await allOrders()) });
 
     if (route === 'orders') {

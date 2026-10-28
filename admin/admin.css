@@ -104,7 +104,7 @@ input[type=checkbox] { width: 22px; height: 22px; min-height: 0; padding: 0; acc
 .attn a.hot { border-color: var(--rust); background: #fdf3ec; } .attn a.hot > b { color: var(--rust); }
 
 /* ---- chart ---- */
-.chart { width: 100%; height: auto; display: block; } .chart text { font: 500 11px var(--sans); fill: #8a7a69; } .chart .col { fill: var(--ink); transition: fill .2s; } .chart .col:hover { fill: var(--rust); } .chart .grid-l { stroke: #eee4d6; }
+.chart { width: 100%; height: auto; display: block; } .chart { fill: none; stroke: none; } .chart text { font: 500 11px var(--sans); fill: #8a7a69; stroke: none; } .chart .col { fill: var(--ink); stroke: none; transition: fill .2s; } .chart .col:hover { fill: var(--rust); } .chart .grid-l { stroke: #eee4d6; stroke-width: 1; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .84rem; color: var(--muted); } .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .stack { display: flex; height: 12px; border-radius: 99px; overflow: hidden; background: #efe6d9; margin: 14px 0 12px; } .stack i { display: block; height: 100%; }
 .hbars { display: grid; gap: 12px; } .hbar { display: grid; gap: 5px; font-size: .88rem; } .hbar > div:first-child { display: flex; justify-content: space-between; gap: 10px; } .hbar > div:last-child { height: 8px; border-radius: 99px; background: #efe6d9; overflow: hidden; } .hbar i { display: block; height: 100%; border-radius: 99px; background: var(--ink); }
@@ -231,3 +231,9 @@ label.is-busy { opacity: .5; pointer-events: none; } label.is-busy::after { cont
 .pickbox { width: min(460px, 100%); max-height: 94dvh; overflow: auto; } .pickwrap { position: relative; line-height: 0; border-radius: 12px; overflow: hidden; touch-action: none; background: var(--sand); width: fit-content; margin-inline: auto; } .pickwrap canvas { display: block; cursor: crosshair; touch-action: none; }
 .pickdot { position: absolute; width: 28px; height: 28px; margin: -14px 0 0 -14px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1.5px #000, 0 4px 12px rgba(0, 0, 0, .4); pointer-events: none; }
 .pickread { display: flex; align-items: center; gap: 12px; } .pickchip { width: 40px; height: 40px; border-radius: 50%; background: #eee; box-shadow: inset 0 0 0 1px var(--line); flex: none; }
+
+/* custom date ranges */
+.daterange { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; } .daterange .field { min-width: 150px; flex: 1 1 150px; max-width: 220px; } .daterange .btn { min-height: 48px; }
+.daterange--inline { flex: 1 1 100%; } .daterange--inline input { min-height: 44px; }
+@media (max-width: 480px) { .daterange .field { max-width: none; } .daterange > .btn { flex: 1 1 100%; } }
+#range { flex-wrap: wrap; overflow: visible; }

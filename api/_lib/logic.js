@@ -329,21 +329,36 @@ export function customersFrom(orders) {
   return [...map.values()].sort((a, b) => b.spent - a.spent);
 }
 
-export async function overview(days = 14) {
-  days = [7, 14, 30, 90].includes(days) ? days : 14;
+const dkey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+/** days: 7 | 14 | 30 | 90, or a custom range from / to (YYYY-MM-DD, both days included, up to a year). */
+export async function overview(days = 14, from = '', to = '') {
   const [orders, products, stats, settings, categories] = await Promise.all([allOrders(), allProducts(), db.hgetall('levit:stats'), getSettings(), getCategories()]);
   const live = orders.filter((o) => o.status !== 'cancelled');
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const since = new Date(today); since.setDate(since.getDate() - (days - 1));
-  const prevSince = new Date(since); prevSince.setDate(prevSince.getDate() - days);
-  const inWin = live.filter((o) => new Date(o.createdAt) >= since);
+  const DAY = 864e5, today = new Date(); today.setHours(0, 0, 0, 0);
+  let since, end, custom = false;
+  if (YMD.test(from) && YMD.test(to)) {
+    let a = new Date(from + 'T00:00:00'), z = new Date(to + 'T00:00:00');
+    if (!isNaN(a) && !isNaN(z)) {
+      if (z < a) [a, z] = [z, a];
+      end = new Date(z.getTime() + DAY); since = a; custom = true;
+      if ((end - since) / DAY > 366) since = new Date(end.getTime() - 366 * DAY);
+      days = Math.round((end - since) / DAY);
+    }
+  }
+  if (!custom) {
+    days = [7, 14, 30, 90].includes(days) ? days : 14;
+    since = new Date(today); since.setDate(since.getDate() - (days - 1)); end = new Date(today.getTime() + DAY);
+  }
+  const prevSince = new Date(since.getTime() - days * DAY);
+  const inWin = live.filter((o) => { const d = new Date(o.createdAt); return d >= since && d < end; });
   const inPrev = live.filter((o) => { const d = new Date(o.createdAt); return d >= prevSince && d < since; });
   const sum = (l) => l.reduce((n, o) => n + o.total, 0);
   const revenue = sum(inWin);
 
-  const byDay = {};
-  const series = Array.from({ length: days }, (_, k) => { const d = new Date(today); d.setDate(d.getDate() - (days - 1 - k)); const key = d.toISOString().slice(0, 10); byDay[key] = { date: key, revenue: 0, orders: 0 }; return byDay[key]; });
-  for (const o of inWin) { const d = byDay[new Date(o.createdAt).toISOString().slice(0, 10)]; if (d) { d.revenue += o.total; d.orders += 1; } }
+  const step = days > 92 ? 7 : 1, series = [];                                    // a year of days would be unreadable: bucket by week
+  for (let t = since.getTime(); t < end.getTime(); t += step * DAY) series.push({ date: dkey(new Date(t)), span: step, revenue: 0, orders: 0 });
+  for (const o of inWin) { const k = Math.min(series.length - 1, Math.floor((new Date(o.createdAt) - since) / (step * DAY))); if (series[k]) { series[k].revenue += o.total; series[k].orders += 1; } }
 
   const catOf = Object.fromEntries(products.map((p) => [p.id, p.cat]));
   const top = {}, cats = {};
@@ -364,7 +379,7 @@ export async function overview(days = 14) {
   const customers = customersFrom(orders);
   const counts = Object.fromEntries(STATUSES.map((s) => [s, orders.filter((o) => o.status === s).length]));
   return {
-    days, revenue, orders: inWin.length, aov: inWin.length ? Math.round(revenue / inWin.length) : 0,
+    days, custom, from: dkey(since), to: dkey(new Date(end.getTime() - DAY)), revenue, orders: inWin.length, aov: inWin.length ? Math.round(revenue / inWin.length) : 0,
     prev: { revenue: sum(inPrev), orders: inPrev.length },
     newCustomers: customers.filter((c) => new Date(c.first) >= since).length, customers: customers.length,
     repeatCustomers: customers.filter((c) => c.orders > 1).length,

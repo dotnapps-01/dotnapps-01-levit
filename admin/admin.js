@@ -44,7 +44,8 @@ const ROUTES = [
 
 const els = { auth: $('#auth'), shell: $('#shell'), view: $('#view'), title: $('#title'), actions: $('#actions'), banner: $('#banner'), panel: $('#panel'), scrim: $('#scrim'), toast: $('#toast') };
 let session = null, route = 'overview', ordersCache = [], productsCache = null, newCount = 0, lastTotal = null, dirtyGuard = null;
-const ui = { days: 14, orderTab: 'all', orderQ: '', orderPay: 'all', sel: new Set(), selecting: false, prodQ: '', prodCat: 'all', reorder: false, custQ: '', invLow: false, invQ: '' };
+const ymdLocal = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const ui = { days: 14, custom: false, from: '', to: '', oFrom: '', oTo: '', orderTab: 'all', orderQ: '', orderPay: 'all', sel: new Set(), selecting: false, prodQ: '', prodCat: 'all', reorder: false, custQ: '', invLow: false, invQ: '' };
 
 /* ---------- api, toast, confirm ---------- */
 class ApiError extends Error { constructor(m, status) { super(m); this.status = status; } }
@@ -193,7 +194,8 @@ function openMore() {
 /* ---------- overview ---------- */
 const delta = (cur, prev) => { if (!prev) return cur ? '<span class="delta up">new</span>' : ''; const p = Math.round(((cur - prev) / prev) * 100); return `<span class="delta ${p >= 0 ? 'up' : 'down'}">${p >= 0 ? '+' : ''}${p}%</span>`; };
 async function viewOverview() {
-  const d = await api('overview?days=' + ui.days);
+  const q = ui.custom && ui.from && ui.to ? `from=${ui.from}&to=${ui.to}` : `days=${ui.days}`;
+  const d = await api('overview?' + q);
   setBadge(d.counts.new);
   const banners = [];
   if (!session.persistent) banners.push('<b>Storage is temporary.</b> Orders and edits reset when the server restarts. Connect Upstash Redis or Neon Postgres in Vercel (Storage) and redeploy to keep your data.');
@@ -211,10 +213,11 @@ async function viewOverview() {
     d.paused ? `<a href="#/settings" class="hot"><b>!</b><span>Orders are paused<br>(tap to change)</span></a>` : '',
   ].join('');
   els.view.innerHTML = `
-    <div class="tabs" id="range">${[7, 14, 30, 90].map((n) => `<button class="chip" type="button" data-d="${n}" aria-pressed="${ui.days === n}">${n} days</button>`).join('')}</div>
+    <div class="tabs" id="range">${[7, 14, 30, 90].map((n) => `<button class="chip" type="button" data-d="${n}" aria-pressed="${!ui.custom && ui.days === n}">${n} days</button>`).join('')}<button class="chip" type="button" data-custom aria-pressed="${ui.custom}">Custom dates</button></div>
+    ${ui.custom ? `<form class="daterange" id="drange"><label class="field"><span>From</span><input type="date" name="from" value="${esc(ui.from || d.from)}" max="${ymdLocal()}" required></label><label class="field"><span>To</span><input type="date" name="to" value="${esc(ui.to || d.to)}" max="${ymdLocal()}" required></label><button class="btn btn--ink" type="submit">Show</button></form><p class="hint" style="margin-top:-8px">${esc(new Date(d.from + 'T00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }))} to ${esc(new Date(d.to + 'T00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }))} · ${d.days} day${d.days === 1 ? '' : 's'}${d.days > 92 ? ' · chart shows weeks' : ''}</p>` : ''}
     <div class="attn">${attn}</div>
     <div class="grid g4">
-      ${kpi('Revenue', inr(d.revenue), `${delta(d.revenue, d.prev.revenue)} vs previous ${d.days} days`)}
+      ${kpi('Revenue', inr(d.revenue), `${delta(d.revenue, d.prev.revenue)} vs previous ${d.days} day${d.days === 1 ? '' : 's'}`)}
       ${kpi('Orders', d.orders, `${delta(d.orders, d.prev.orders)} vs previous`)}
       ${kpi('Average order', inr(d.aov), `${inr(d.allTime.revenue)} all time`)}
       ${kpi('New customers', d.newCustomers, `${d.customers} total · ${d.repeatCustomers} repeat`)}
@@ -237,7 +240,9 @@ async function viewOverview() {
       <section class="card"><div class="card__h"><h2>Top customers</h2></div><div class="card__b">${d.topCustomers.length ? `<ul class="list">${d.topCustomers.map((c) => `<li><div class="grow"><b>${esc(c.name)}</b><small>${esc(c.city)} · ${c.orders} order${c.orders === 1 ? '' : 's'}</small></div><b class="num">${inr(c.spent)}</b></li>`).join('')}</ul>` : '<p class="empty">Customers appear after the first order</p>'}</div></section>
       <section class="card"><div class="card__h"><h2>Recent orders</h2><a class="btn btn--sm" href="#/orders">View all</a></div>${d.recent.length ? `<div class="card__b"><ul class="list" id="recent">${d.recent.map((o) => `<li data-open="${esc(o.id)}" tabindex="0" role="button" style="cursor:pointer"><div class="grow"><b>${esc(o.customer.name)}</b><small>${esc(o.id)} · ${ago(o.createdAt)}</small></div><span class="pill s-${o.status}">${o.status}</span><b class="num">${inr(o.total)}</b></li>`).join('')}</ul></div>` : '<p class="empty">Orders will appear here as they come in</p>'}</section>
     </div>`;
-  $$('#range [data-d]').forEach((b) => b.addEventListener('click', () => { ui.days = +b.dataset.d; render(); }));
+  $$('#range [data-d]').forEach((b) => b.addEventListener('click', () => { ui.days = +b.dataset.d; ui.custom = false; render(); }));
+  $('#range [data-custom]').addEventListener('click', () => { if (!ui.custom) { ui.custom = true; ui.from = ui.from || d.from; ui.to = ui.to || d.to; render(); } });
+  $('#drange')?.addEventListener('submit', (e) => { e.preventDefault(); const f = e.target; if (!f.from.value || !f.to.value) return; ui.from = f.from.value; ui.to = f.to.value; render(); });
   $$('.attn a[data-tab]').forEach((a) => a.addEventListener('click', () => { ui.orderTab = a.dataset.tab; }));
   $$('[data-low]').forEach((a) => a.addEventListener('click', () => { ui.invLow = true; }));
   ordersCache = d.recent; bindOrderRows($('#recent'), () => ordersCache);
@@ -254,7 +259,7 @@ function chart(series) {
     const h = Math.max(s.revenue ? 3 : 0, (s.revenue / nice) * (H - pt - pb)), x = pl + i * bw + bw * 0.18, w = bw * 0.64, y = H - pb - h;
     const dt = new Date(s.date + 'T00:00:00');
     const lab = (n - 1 - i) % step === 0 ? `<text x="${x + w / 2}" y="${H - 10}" text-anchor="middle">${dt.getDate()} ${dt.toLocaleString('en', { month: 'short' })}</text>` : '';
-    return `<rect class="col" x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(4, w / 2)}"><title>${dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}: ${inr(s.revenue)} · ${s.orders} order${s.orders === 1 ? '' : 's'}</title></rect>${lab}`;
+    return `<rect class="col" x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(4, w / 2)}"><title>${s.span > 1 ? 'Week of ' : ''}${dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}: ${inr(s.revenue)} · ${s.orders} order${s.orders === 1 ? '' : 's'}</title></rect>${lab}`;
   }).join('');
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Revenue per day">${g}${bars}</svg>`;
 }
@@ -299,11 +304,13 @@ async function viewOrders() {
   els.view.innerHTML = `
     <div class="tabs" id="otabs"></div>
     <div class="bar"><input type="search" id="oq" placeholder="Search name, order, phone, city" aria-label="Search orders" value="${esc(ui.orderQ)}">
-      <select id="opay" aria-label="Payment filter" style="width:auto;min-width:170px"><option value="all">All payments</option>${Object.entries(PAY).map(([k, v]) => `<option value="${k}" ${ui.orderPay === k ? 'selected' : ''}>${v}</option>`).join('')}<option value="unpaid" ${ui.orderPay === 'unpaid' ? 'selected' : ''}>Not marked paid</option></select></div>
+      <select id="opay" aria-label="Payment filter" style="width:auto;min-width:170px"><option value="all">All payments</option>${Object.entries(PAY).map(([k, v]) => `<option value="${k}" ${ui.orderPay === k ? 'selected' : ''}>${v}</option>`).join('')}<option value="unpaid" ${ui.orderPay === 'unpaid' ? 'selected' : ''}>Not marked paid</option></select>
+      <div class="daterange daterange--inline"><label class="field"><span>From</span><input type="date" id="ofrom" value="${esc(ui.oFrom)}"></label><label class="field"><span>To</span><input type="date" id="oto" value="${esc(ui.oTo)}"></label>${ui.oFrom || ui.oTo ? '<button class="btn btn--sm" type="button" id="oclr">Clear dates</button>' : ''}</div></div>
     <section class="card rows" id="olist"></section><div id="bulk"></div>`;
   const current = () => {
     const q = ui.orderQ.trim().toLowerCase();
     return ordersCache.filter((o) => (ui.orderTab === 'all' || o.status === ui.orderTab) && (ui.orderPay === 'all' || (ui.orderPay === 'unpaid' ? !o.paid && o.status !== 'cancelled' : o.pay === ui.orderPay))
+      && (!ui.oFrom || ymdLocal(new Date(o.createdAt)) >= ui.oFrom) && (!ui.oTo || ymdLocal(new Date(o.createdAt)) <= ui.oTo)
       && (!q || [o.id, o.customer.name, o.customer.phone, o.customer.email, o.address.city].join(' ').toLowerCase().includes(q)));
   };
   function paint() {
@@ -316,6 +323,9 @@ async function viewOrders() {
   bindOrderRows($('#olist'), current, { onChange: paint });
   $('#oq').addEventListener('input', (e) => { ui.orderQ = e.target.value; paint(); });
   $('#opay').addEventListener('change', (e) => { ui.orderPay = e.target.value; paint(); });
+  $('#ofrom').addEventListener('change', (e) => { ui.oFrom = e.target.value; render(); });
+  $('#oto').addEventListener('change', (e) => { ui.oTo = e.target.value; render(); });
+  $('#oclr')?.addEventListener('click', () => { ui.oFrom = ui.oTo = ''; render(); });
   window.__repaintOrders = paint;
   function updateBulkInner() {
     const bar = $('#bulk'); if (!bar) return;
