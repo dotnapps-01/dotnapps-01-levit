@@ -16,7 +16,7 @@ import { db, persistent, storage } from './_lib/db.js';
 import { checkPassword, sessionCookie, clearCookie, isAdmin, configured, usingDefaultPassword, throttled, noteFailure } from './_lib/auth.js';
 import {
   publicCatalog, createOrder, allOrders, updateOrder, allProducts, createProduct, updateProduct, deleteProduct, reorderProducts, setStock,
-  getSettings, saveSettings, deleteOrder, overview, customersFrom, checkCoupon, activity, backup, logAct, getCategories, saveCategories, STATUSES, SIZES,
+  getSettings, saveSettings, deleteOrder, overview, customersWithMeta, saveCustomerMeta, checkCoupon, activity, backup, logAct, getCategories, saveCategories, STATUSES, SIZES,
 } from './_lib/logic.js';
 import { SCHEMA, GROUPS, getContent, saveContent } from './_lib/content.js';
 import { saveImage, getImage, listImages } from './_lib/images.js';
@@ -115,7 +115,10 @@ export default async function handler(req, res) {
     }
     if (route === 'stock' && method === 'POST') return send(res, 200, { updated: await setStock((await readJson(req)).updates) });
     if (route === 'overview' && method === 'GET') return send(res, 200, { ...(await overview(Number(url.searchParams.get('days')) || 14, url.searchParams.get('from') || '', url.searchParams.get('to') || '')), persistent });
-    if (route === 'customers' && method === 'GET') return send(res, 200, { customers: customersFrom(await allOrders()) });
+    if (route === 'customers') {
+      if (method === 'GET') return send(res, 200, { customers: await customersWithMeta() });
+      if (method === 'PUT' && parts[2]) { const r = await saveCustomerMeta(parts[2], await readJson(req)); if (r.error) return send(res, 422, { error: r.error }); return send(res, 200, r); }
+    }
 
     if (route === 'orders') {
       if (method === 'GET') return send(res, 200, { orders: await allOrders(), statuses: STATUSES });

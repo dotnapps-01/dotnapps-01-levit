@@ -351,6 +351,21 @@ export function customersFrom(orders) {
 const dkey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 /** days: 7 | 14 | 30 | 90, or a custom range from / to (YYYY-MM-DD, both days included, up to a year). */
+/** Customers (grouped from orders) with the private note and tags the team has added. */
+export async function customersWithMeta() {
+  const [orders, meta] = await Promise.all([allOrders(), db.hgetall('levit:custmeta')]);
+  return customersFrom(orders).map((c) => ({ ...c, note: meta[c.key]?.note || '', tags: meta[c.key]?.tags || [] }));
+}
+export async function saveCustomerMeta(key, input) {
+  const k = String(key || '').toLowerCase().slice(0, 160);
+  if (!k) return { error: 'Unknown customer' };
+  const tags = [...new Set((Array.isArray(input.tags) ? input.tags : []).map((t) => String(t).replace(/\s+/g, ' ').trim().slice(0, 16)).filter(Boolean))].slice(0, 8);
+  const meta = { note: String(input.note || '').slice(0, 500), tags };
+  if (!meta.note && !tags.length) await db.hdel('levit:custmeta', k); else await db.hset('levit:custmeta', k, meta);
+  await logAct(`Updated customer ${k}`);
+  return { meta };
+}
+
 export async function overview(days = 14, from = '', to = '') {
   const [orders, products, stats, settings, categories] = await Promise.all([allOrders(), allProducts(), db.hgetall('levit:stats'), getSettings(), getCategories()]);
   const live = orders.filter((o) => o.status !== 'cancelled');

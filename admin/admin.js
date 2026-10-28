@@ -45,7 +45,7 @@ const ROUTES = [
 const els = { auth: $('#auth'), shell: $('#shell'), view: $('#view'), title: $('#title'), actions: $('#actions'), banner: $('#banner'), panel: $('#panel'), scrim: $('#scrim'), toast: $('#toast') };
 let session = null, route = 'overview', ordersCache = [], productsCache = null, newCount = 0, lastTotal = null, dirtyGuard = null;
 const ymdLocal = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const ui = { days: 14, custom: false, from: '', to: '', oFrom: '', oTo: '', orderTab: 'all', orderQ: '', orderPay: 'all', sel: new Set(), selecting: false, prodQ: '', prodCat: 'all', reorder: false, custQ: '', invLow: false, invQ: '' };
+const ui = { cs: { seg: 'all', sort: 'spent', city: 'all', min: '', from: '', to: '', q: '' }, days: 14, custom: false, from: '', to: '', oFrom: '', oTo: '', orderTab: 'all', orderQ: '', orderPay: 'all', sel: new Set(), selecting: false, prodQ: '', prodCat: 'all', reorder: false, custQ: '', invLow: false, invQ: '' };
 
 /* ---------- api, toast, confirm ---------- */
 class ApiError extends Error { constructor(m, status) { super(m); this.status = status; } }
@@ -768,17 +768,99 @@ async function viewInventory() {
 }
 
 /* ---------- customers ---------- */
+const VIP_AT = 5000, LAPSED_DAYS = 30;
+const daysSince = (iso) => (Date.now() - new Date(iso)) / 864e5;
+const SEGS = {
+  all: ['All', () => true], new: ['One order', (c) => c.orders === 1], repeat: ['Repeat', (c) => c.orders > 1],
+  vip: [`VIP (${inr(VIP_AT)}+ or 3+ orders)`, (c) => c.spent >= VIP_AT || c.orders >= 3], lapsed: [`Not back in ${LAPSED_DAYS}+ days`, (c) => daysSince(c.last) > LAPSED_DAYS],
+};
+const SORTS = { spent: ['Highest spend', (a, b) => b.spent - a.spent], orders: ['Most orders', (a, b) => b.orders - a.orders || b.spent - a.spent], recent: ['Ordered most recently', (a, b) => b.last.localeCompare(a.last)], oldest: ['Longest since last order', (a, b) => a.last.localeCompare(b.last)], newest: ['Newest customers', (a, b) => b.first.localeCompare(a.first)], name: ['Name A to Z', (a, b) => a.name.localeCompare(b.name)] };
+const copyText = async (text, what) => { try { await navigator.clipboard.writeText(text); toast(`${what} copied`); } catch { prompt(`Copy ${what}:`, text); } };
+
 async function viewCustomers() {
   const { customers } = await api('customers');
-  action('Export CSV', () => downloadCsv('levit-customers.csv', [['Name', 'Email', 'Phone', 'City', 'Orders', 'Spent', 'First order', 'Last order'], ...customers.map((c) => [c.name, c.email, c.phone, c.city, c.orders, c.spent, c.first, c.last])]));
-  els.view.innerHTML = `<div class="bar"><p class="hint">${customers.length} customer${customers.length === 1 ? '' : 's'}, grouped by email</p><input type="search" id="cq" placeholder="Search customers" aria-label="Search customers" value="${esc(ui.custQ)}"></div><section class="card rows" id="clist"></section>`;
-  const paint = () => {
-    const q = ui.custQ.trim().toLowerCase(), list = customers.filter((c) => !q || [c.name, c.email, c.phone, c.city].join(' ').toLowerCase().includes(q));
-    $('#clist').innerHTML = list.length ? list.map((c) => `<div class="row row--cust" style="cursor:default"><div class="meta"><b>${esc(c.name)}</b>${c.orders > 1 ? ' <span class="pill s-delivered">repeat</span>' : ''}<span class="sub">${esc(c.city)} · ${c.orders} order${c.orders === 1 ? '' : 's'} · ${inr(c.spent)} · last ${ago(c.last)}</span><span class="sub">${esc(c.email)} · ${esc(c.phone)}</span></div>
-      <div style="display:flex;gap:6px"><a class="icon" href="${waLink(c.phone, `Hi ${c.name.split(' ')[0]}, thank you for shopping with LEVIT!`)}" target="_blank" rel="noopener" aria-label="WhatsApp">${ICON.wa}</a><a class="icon" href="tel:${esc(c.phone)}" aria-label="Call">${ICON.phone}</a><a class="icon" href="mailto:${esc(c.email)}" aria-label="Email">${ICON.mail}</a></div></div>`).join('') : `<p class="empty">${customers.length ? 'No one matches' : 'Customers appear after their first order'}</p>`;
+  const f = ui.cs, cities = [...new Set(customers.map((c) => c.city).filter(Boolean))].sort();
+  const lifetime = customers.reduce((n, c) => n + c.spent, 0), repeatN = customers.filter((c) => c.orders > 1).length;
+  const kpi = (l, v, t) => `<div class="card kpi"><small>${l}</small><b class="num">${v}</b><span>${t}</span></div>`;
+  const moreOn = () => f.city !== 'all' || f.min || f.from || f.to;
+  els.view.innerHTML = `
+    <div class="grid g3">${kpi('Customers', customers.length, `${customers.filter((c) => daysSince(c.first) <= 30).length} new in the last 30 days`)}${kpi('Repeat customers', customers.length ? Math.round((repeatN / customers.length) * 100) + '%' : '0%', `${repeatN} ordered more than once`)}${kpi('Average spend', inr(customers.length ? lifetime / customers.length : 0), `${inr(lifetime)} in total`)}</div>
+    <div class="tabs" id="csegs"></div>
+    <div class="bar"><input type="search" id="cq" placeholder="Search name, phone, email, city or tag" aria-label="Search customers" value="${esc(f.q)}"><select id="csort" aria-label="Sort" style="width:auto;min-width:200px">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${f.sort === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
+    <details class="grp" id="cmore" ${moreOn() ? 'open' : ''}><summary><div><b>More filters</b><small>City, spend and last order date</small></div><span class="dot" ${moreOn() ? '' : 'hidden'}></span></summary><div class="grp__b">
+      <div class="row2"><label class="field"><span>City</span><select id="ccity"><option value="all">All cities</option>${cities.map((c) => `<option ${f.city === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label><label class="field"><span>Spent at least (₹)</span><input id="cmin" type="number" inputmode="numeric" min="0" value="${esc(f.min)}" placeholder="0"></label></div>
+      <div class="row2"><label class="field"><span>Last ordered from</span><input id="cfrom" type="date" value="${esc(f.from)}"></label><label class="field"><span>Last ordered until</span><input id="cto" type="date" value="${esc(f.to)}"></label></div>
+      <div><button class="btn btn--sm" type="button" id="cclear">Clear all filters</button></div></div></details>
+    <div class="bar"><p class="hint" id="ccount"></p><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn--sm" type="button" id="cmail">Copy emails</button><button class="btn btn--sm" type="button" id="cphone">Copy phone numbers</button><button class="btn btn--sm" type="button" id="ccsv">Export CSV</button></span></div>
+    <section class="card rows" id="clist"></section>`;
+  const list = () => {
+    const q = f.q.trim().toLowerCase(), pred = f.seg.startsWith('tag:') ? (c) => c.tags.includes(f.seg.slice(4)) : SEGS[f.seg]?.[1] || (() => true);
+    return customers.filter((c) => pred(c) && (!q || [c.name, c.email, c.phone, c.city, ...c.tags].join(' ').toLowerCase().includes(q))
+      && (f.city === 'all' || c.city === f.city) && (!f.min || c.spent >= Number(f.min))
+      && (!f.from || ymdLocal(new Date(c.last)) >= f.from) && (!f.to || ymdLocal(new Date(c.last)) <= f.to)).sort(SORTS[f.sort][1]);
   };
-  $('#cq').addEventListener('input', (e) => { ui.custQ = e.target.value; paint(); });
+  const paint = () => {
+    $('#csegs').innerHTML = [...Object.entries(SEGS).map(([k, v]) => [k, v[0], customers.filter(v[1]).length]), ...[...new Set(customers.flatMap((c) => c.tags))].sort().map((t) => ['tag:' + t, '# ' + t, customers.filter((c) => c.tags.includes(t)).length])]
+      .map(([k, label, n]) => `<button class="chip" type="button" data-s="${esc(k)}" aria-pressed="${f.seg === k}">${esc(label)}<small class="num">${n}</small></button>`).join('');
+    const rows = list(); $('#ccount').textContent = `${rows.length} of ${customers.length} customer${customers.length === 1 ? '' : 's'}`;
+    $('#clist').innerHTML = rows.length ? rows.map((c) => `<div class="row row--cust" data-key="${esc(c.key)}" tabindex="0" role="button"><div class="meta"><b>${esc(c.name)}</b> ${c.orders > 1 ? '<span class="pill s-delivered">repeat</span>' : ''} ${c.spent >= VIP_AT || c.orders >= 3 ? '<span class="pill s-packed">VIP</span>' : ''} ${c.tags.map((t) => `<span class="pill s-draft">${esc(t)}</span>`).join(' ')}
+      <span class="sub">${esc(c.city)} · ${c.orders} order${c.orders === 1 ? '' : 's'} · <b style="font-weight:600;color:var(--ink)">${inr(c.spent)}</b> · last order ${ago(c.last)}</span><span class="sub">${esc(c.phone)} · ${esc(c.email)}</span>${c.note ? `<span class="sub">Note: ${esc(c.note.slice(0, 70))}${c.note.length > 70 ? '…' : ''}</span>` : ''}</div>
+      <div class="cacts"><a class="icon" href="${waLink(c.phone, `Hi ${c.name.split(' ')[0]}, thank you for shopping with LEVIT!`)}" target="_blank" rel="noopener" aria-label="WhatsApp ${esc(c.name)}">${ICON.wa}</a><a class="icon" href="tel:${esc(c.phone)}" aria-label="Call ${esc(c.name)}">${ICON.phone}</a><a class="icon" href="mailto:${esc(c.email)}" aria-label="Email ${esc(c.name)}">${ICON.mail}</a></div></div>`).join('')
+      : `<p class="empty">${customers.length ? 'No customers match these filters.' : 'Customers appear after their first order.'}</p>`;
+    $$('#csegs .chip').forEach((b) => b.addEventListener('click', () => { f.seg = b.dataset.s; paint(); }));
+    $('#cmore .dot').hidden = !moreOn();
+  };
+  $('#clist').addEventListener('click', (e) => { if (e.target.closest('.cacts')) return; const r = e.target.closest('[data-key]'); if (r) openCustomer(customers.find((c) => c.key === r.dataset.key), paint); });
+  $('#clist').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('[data-key]')) e.target.click(); });
+  $('#cq').addEventListener('input', (e) => { f.q = e.target.value; paint(); });
+  $('#csort').addEventListener('change', (e) => { f.sort = e.target.value; paint(); });
+  $('#ccity').addEventListener('change', (e) => { f.city = e.target.value; paint(); });
+  $('#cmin').addEventListener('input', (e) => { f.min = e.target.value; paint(); });
+  $('#cfrom').addEventListener('change', (e) => { f.from = e.target.value; paint(); });
+  $('#cto').addEventListener('change', (e) => { f.to = e.target.value; paint(); });
+  $('#cclear').addEventListener('click', () => { Object.assign(f, { seg: 'all', q: '', city: 'all', min: '', from: '', to: '', sort: 'spent' }); render(); });
+  $('#cmail').addEventListener('click', () => { const l = [...new Set(list().map((c) => c.email).filter(Boolean))]; if (!l.length) return toast('No customers to copy', { err: true }); copyText(l.join(', '), `${l.length} email${l.length === 1 ? '' : 's'}`); });
+  $('#cphone').addEventListener('click', () => { const l = [...new Set(list().map((c) => c.phone).filter(Boolean))]; if (!l.length) return toast('No customers to copy', { err: true }); copyText(l.join('\n'), `${l.length} phone number${l.length === 1 ? '' : 's'}`); });
+  $('#ccsv').addEventListener('click', () => downloadCsv('levit-customers.csv', [['Name', 'Email', 'Phone', 'City', 'Orders', 'Spent', 'First order', 'Last order', 'Tags', 'Note'], ...list().map((c) => [c.name, c.email, c.phone, c.city, c.orders, c.spent, c.first, c.last, c.tags.join('; '), c.note])]));
   paint();
+}
+
+async function openCustomer(c, onSaved) {
+  const { orders: all } = await api('orders'); ordersCache = all;
+  const mine = all.filter((o) => (o.customer.email || o.customer.phone).toLowerCase() === c.key), live = mine.filter((o) => o.status !== 'cancelled');
+  const fav = {}, pays = {};
+  for (const o of live) { pays[o.pay] = (pays[o.pay] || 0) + 1; for (const l of o.lines) fav[l.name] = (fav[l.name] || 0) + l.qty; }
+  const favList = Object.entries(fav).sort((a, b) => b[1] - a[1]).slice(0, 4), payTop = Object.entries(pays).sort((a, b) => b[1] - a[1])[0];
+  let tags = [...c.tags];
+  const SUGG = ['VIP', 'Wholesale', 'Influencer', 'Friend', 'Do not call'];
+  const body = `
+    <div class="quick noprint"><a href="${waLink(c.phone, `Hi ${c.name.split(' ')[0]}, thank you for shopping with LEVIT!`)}" target="_blank" rel="noopener">${ICON.wa}WhatsApp</a><a href="tel:${esc(c.phone)}">${ICON.phone}Call</a><a href="mailto:${esc(c.email)}">${ICON.mail}Email</a></div>
+    <section class="sec"><h3>Summary</h3><dl class="kv"><dt>Phone</dt><dd>${esc(c.phone)}</dd><dt>Email</dt><dd>${esc(c.email)}</dd><dt>City</dt><dd>${esc(c.city)}</dd><dt>Customer since</dt><dd>${when(c.first, true)}</dd><dt>Last order</dt><dd>${ago(c.last)}</dd><dt>Orders</dt><dd class="num">${c.orders}${mine.length !== live.length ? ` (${mine.length - live.length} cancelled)` : ''}</dd><dt>Total spent</dt><dd class="num"><b>${inr(c.spent)}</b></dd><dt>Average order</dt><dd class="num">${inr(live.length ? c.spent / live.length : 0)}</dd>${payTop ? `<dt>Usually pays by</dt><dd>${PAY[payTop[0]] || payTop[0]}</dd>` : ''}</dl></section>
+    ${favList.length ? `<section class="sec"><h3>Favourite pieces</h3><ul class="list">${favList.map(([n, q]) => `<li><div class="grow"><b>${esc(n)}</b></div><span class="hint num">${q} bought</span></li>`).join('')}</ul></section>` : ''}
+    <section class="sec"><h3>Tags</h3><div id="ctags" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      <div style="display:flex;gap:8px"><input id="ctagin" maxlength="16" placeholder="Add a tag, e.g. Wholesale" aria-label="New tag"><button class="btn" type="button" id="ctagadd">Add</button></div>
+      <div id="ctagsug" style="display:flex;gap:8px;flex-wrap:wrap"></div></section>
+    <section class="sec"><h3>Private note</h3><textarea id="cnote" maxlength="500" placeholder="Size, style, delivery notes, anything the team should remember">${esc(c.note)}</textarea></section>
+    <section class="sec"><h3>Orders (${mine.length})</h3><ul class="list" id="cord">${mine.map((o) => `<li data-oid="${esc(o.id)}" tabindex="0" role="button" style="cursor:pointer"><div class="grow"><b>${esc(o.id)}</b><small>${when(o.createdAt)} · ${o.lines.reduce((n, l) => n + l.qty, 0)} item${o.lines.reduce((n, l) => n + l.qty, 0) === 1 ? '' : 's'}</small></div><span class="pill s-${o.status}">${o.status}</span><b class="num">${inr(o.total)}</b></li>`).join('')}</ul></section>`;
+  openPanel(c.name, body, `<button class="btn btn--ink" id="csave" type="button">Save notes and tags</button>`);
+  const drawTags = () => {
+    $('#ctags').innerHTML = tags.length ? tags.map((t, i) => `<span class="pill s-draft" style="padding:6px 8px 6px 12px">${esc(t)} <button type="button" data-rmtag="${i}" aria-label="Remove tag ${esc(t)}" style="margin-left:4px;font-size:.9rem;line-height:1">✕</button></span>`).join('') : '<span class="hint">No tags yet</span>';
+    $('#ctagsug').innerHTML = [...new Set([...SUGG, ...c.tags])].filter((t) => !tags.includes(t)).map((t) => `<button class="chip" type="button" data-addtag="${esc(t)}" style="min-height:36px;font-size:.84rem">+ ${esc(t)}</button>`).join('');
+  };
+  drawTags();
+  const addTag = (t) => { t = t.trim().slice(0, 16); if (t && !tags.includes(t) && tags.length < 8) { tags.push(t); drawTags(); } };
+  $('#panel-body').onclick = (e) => {
+    const rm = e.target.closest('[data-rmtag]'); if (rm) { tags.splice(+rm.dataset.rmtag, 1); drawTags(); return; }
+    const ad = e.target.closest('[data-addtag]'); if (ad) { addTag(ad.dataset.addtag); return; }
+    if (e.target.closest('#ctagadd')) { addTag($('#ctagin').value); $('#ctagin').value = ''; return; }
+    const li = e.target.closest('[data-oid]'); if (li) { const o = ordersCache.find((x) => x.id === li.dataset.oid); if (o) openOrder(o); }
+  };
+  $('#ctagin').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addTag($('#ctagin').value); $('#ctagin').value = ''; } });
+  $('#csave').addEventListener('click', guard(async () => {
+    addTag($('#ctagin').value);
+    const { meta } = await api('customers/' + encodeURIComponent(c.key), { method: 'PUT', body: { note: $('#cnote').value, tags } });
+    c.note = meta.note; c.tags = meta.tags; toast('Saved'); closePanel(); onSaved?.();
+  }));
 }
 
 /* ---------- offers and coupons ---------- */

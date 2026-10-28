@@ -137,7 +137,7 @@ input[type=checkbox] { width: 22px; height: 22px; min-height: 0; padding: 0; acc
 .row--prod .meta { min-width: 0; } .row--prod .meta b { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row--prod .side-r { display: grid; justify-items: end; gap: 6px; }
 .row--prod .arrows { display: flex; gap: 4px; } .row--prod .arrows button { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: #fff; display: grid; place-items: center; } .row--prod .arrows button:disabled { opacity: .3; }
-.row--cust { grid-template-columns: minmax(0, 1fr) auto; } .row--cust .meta b { font-weight: 500; }
+.row--cust { grid-template-columns: minmax(0, 1fr) auto; }
 .row--coupon { grid-template-columns: minmax(0, 1fr) auto; }
 .row--log { grid-template-columns: 1fr auto; cursor: default; padding-block: 12px; } .row--log:hover { background: transparent; } .row--log time { color: var(--muted); font-size: .8rem; white-space: nowrap; }
 
@@ -261,3 +261,8 @@ label.is-busy { opacity: .5; pointer-events: none; } label.is-busy::after { cont
   .slip--small .l-pay { font-size: 8.5pt; padding: 1mm; } .slip--small .l-pay.cod { font-size: 10.5pt; }
   .l-items { font-size: 9pt; color: #222; } .slip--small .l-items { font-size: 7.5pt; } .l-trk { font-size: 9.5pt; font-weight: 500; } .l-from { font-size: 8.5pt; border-top: .8pt dashed #000; padding-top: 1.5mm; } .slip--small .l-from { font-size: 6.5pt; }
 }
+
+/* customers */
+.cacts { display: flex; gap: 4px; } .row--cust .meta { display: block; min-width: 0; } .row--cust .meta .sub { margin-top: 2px; } .row--cust .meta > b { font-weight: 600; }
+.row--cust { cursor: pointer; }
+.pill.s-draft { text-transform: none; }
