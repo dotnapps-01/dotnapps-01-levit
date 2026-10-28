@@ -10,7 +10,7 @@ export const DEFAULT_CATEGORIES = seed.categories;
 const DEFAULT_SETTINGS = {
   storeName: 'LEVIT',
   freeShip: 1999, shipFee: 99, codFee: 49, lowStock: 2,
-  fromAddress: '',
+  fromAddress: '', templates: {},
   paused: false, pauseMessage: 'We are taking a short break from orders. Please check back soon.',
   offer: { code: 'LEVIT10', pct: 10, active: true, delay: 9 },
   coupons: [],
@@ -36,6 +36,17 @@ function cleanCoupons(list, welcome) {
       min: int(c.min, 0), limit: int(c.limit, 0), active: c.active !== false,
       expires: /^\d{4}-\d{2}-\d{2}$/.test(c.expires || '') ? c.expires : '', note: String(c.note || '').slice(0, 60),
     });
+  }
+  return out;
+}
+
+const TPL_KEYS = ['confirm', 'packed', 'shipped', 'delivered', 'cancelled', 'payment', 'review', 'thanks', 'winback', 'offer'];
+function cleanTemplates(obj) {
+  const out = {};
+  for (const k of TPL_KEYS) {
+    const t = obj?.[k]; if (!t) continue;
+    const subject = String(t.subject || '').replace(/\s+/g, ' ').trim().slice(0, 150), body = String(t.body || '').replace(/\r/g, '').trim().slice(0, 1600);
+    if (subject || body) out[k] = { subject, body };
   }
   return out;
 }
@@ -69,6 +80,7 @@ export async function saveSettings(input) {
     offer,
     coupons: cleanCoupons(input.coupons === undefined ? cur.coupons : input.coupons, offer.code),
     labels: input.labels === undefined ? cur.labels : cleanLabels(input.labels),
+    templates: input.templates === undefined ? (cur.templates || {}) : cleanTemplates(input.templates),
   };
   await db.set('levit:settings', next);
   return next;

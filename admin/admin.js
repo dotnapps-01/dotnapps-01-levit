@@ -381,9 +381,9 @@ function openOrder(o) {
   const body = `
     <div class="steps noprint">${STATUS.map((s) => `<button type="button" class="btn btn--sm ${o.status === s ? 'btn--ink' : s === 'cancelled' ? 'btn--danger' : ''}" data-set="${s}" ${o.status === s ? 'disabled' : ''}>${s === 'cancelled' ? 'Cancel order' : s[0].toUpperCase() + s.slice(1)}</button>`).join('')}</div>
     <div class="quick noprint">
-      <a href="${waLink(o.customer.phone, waText(o))}" target="_blank" rel="noopener">${ICON.wa}WhatsApp</a>
+      <button type="button" data-cmp="wa">${ICON.wa}WhatsApp</button>
       <a href="tel:${esc(o.customer.phone)}">${ICON.phone}Call</a>
-      <a href="mailto:${esc(o.customer.email)}?subject=${encodeURIComponent('Your LEVIT order ' + o.id)}">${ICON.mail}Email</a>
+      <button type="button" data-cmp="mail">${ICON.mail}Email</button>
     </div>
     <section class="sec"><h3>Customer</h3><dl class="kv"><dt>Name</dt><dd>${esc(o.customer.name)}</dd><dt>Email</dt><dd>${esc(o.customer.email)}</dd><dt>Phone</dt><dd>${esc(o.customer.phone)}</dd><dt>Placed</dt><dd>${when(o.createdAt, true)}</dd></dl></section>
     <section class="sec"><h3>Ship to</h3><p>${esc(o.address.address)}<br>${esc(o.address.city)} ${esc(o.address.pin)}</p></section>
@@ -409,6 +409,7 @@ function openOrder(o) {
   $('#otsave').addEventListener('click', () => patch({ paid: $('#opaid').checked, tracking: { courier: $('#otc').value, number: $('#otn').value } }, 'Saved'));
   $('#osave').addEventListener('click', () => patch({ note: $('#onote').value }, 'Note saved'));
   $('#oprint').addEventListener('click', guard(() => printOrders([o])));
+  $$('[data-cmp]', els.panel).forEach((b) => b.addEventListener('click', guard(() => openComposer(o.customer, o, b.dataset.cmp, () => openOrder(o)))));
   $('#odel').addEventListener('click', guard(async () => {
     const back = o.status !== 'cancelled' && o.status !== 'delivered';
     if (!(await confirmBox({ title: `Delete order ${o.id}?`, text: `This removes the order for good${back ? ' and puts its items back in stock' : ''}. To keep a record, cancel it instead.`, yes: 'Delete order', danger: true }))) return;
@@ -469,6 +470,90 @@ async function printOrders(list) {
   root.className = 'slip-root slip-root--' + size; root.innerHTML = list.map((o) => slipHTML(o, size, from)).join('');
   await new Promise((r) => setTimeout(r, 60));
   closePanel(true); setTimeout(() => print(), 80);
+}
+
+/* ---------- messages: WhatsApp and email with the details already filled in ---------- */
+const SIGN = '\n\nWarm regards,\nTeam {store}';
+const TPL = {
+  confirm: { label: 'Order confirmation', subject: 'Your {store} order {order} is confirmed', body: 'Hi {name},\n\nThank you for shopping with {store}! We have received your order {order}.\n\n{items}\n\nTotal: {total}\nPayment: {payment}\nDelivering to:\n{address}\n\nWe will message you again as soon as it ships.' + SIGN },
+  packed: { label: 'Order packed', subject: 'Your {store} order {order} is packed', body: 'Hi {name},\n\nGood news: your order {order} is packed and will be handed to the courier shortly.\n\n{items}\n\nTotal: {total}\nPayment: {payment}' + SIGN },
+  shipped: { label: 'Order shipped (with tracking)', subject: 'Your {store} order {order} is on its way', body: 'Hi {name},\n\nYour order {order} has shipped and is on its way to:\n{address}\n\n{trackline}\n\n{items}\n\nPayment: {payment}\nIf anything looks wrong when it arrives, reply here and we will sort it out.' + SIGN },
+  delivered: { label: 'Delivered, thank you', subject: 'Your {store} order {order} was delivered', body: 'Hi {name},\n\nYour order {order} has been delivered. We hope you love it!\n\nNot the right size? You can swap it within 7 days: keep the tags on and reply to this message.\n\nWe would love to see you wearing it. Tag us in your photos!' + SIGN },
+  cancelled: { label: 'Order cancelled', subject: 'Your {store} order {order} was cancelled', body: 'Hi {name},\n\nYour order {order} ({total}) has been cancelled. If you did not ask for this, or you would like to place it again, just reply and we will help right away.' + SIGN },
+  payment: { label: 'Payment reminder', subject: 'Payment pending for your {store} order {order}', body: 'Hi {name},\n\nThis is a friendly reminder that payment for your order {order} ({total}) is still pending.\n\n{items}\n\nOnce it is paid we will pack and ship it right away. Reply here if you need any help.' + SIGN },
+  review: { label: 'Ask for a review', subject: 'How was your {store} order?', body: 'Hi {name},\n\nThank you for your recent order {order}. How is everything fitting? A quick reply or a photo helps us a lot, and we would love to hear what you think.' + SIGN },
+  thanks: { label: 'Thank you (any customer)', subject: 'Thank you for shopping with {store}', body: 'Hi {name},\n\nThank you for being part of {store}. You have placed {orders} order(s) with us and we truly appreciate it.\n\nIf you need anything, we are one message away.' + SIGN },
+  winback: { label: 'We miss you (comeback offer)', subject: 'We miss you at {store}: {codeoff} for you', body: 'Hi {name},\n\nIt has been a while! We have new pieces in and we would love to see you again.\n\nUse code {code} for {codeoff}.\n\nHappy shopping!' + SIGN },
+  offer: { label: 'Share an offer code', subject: '{codeoff} on your next {store} order', body: 'Hi {name},\n\nA little something for you: use code {code} at checkout for {codeoff}.\n\nShop now and let us know if you need help choosing a size.' + SIGN },
+};
+const tplFor = (st) => ({ ...TPL, ...Object.fromEntries(Object.entries(settingsCache?.templates || {}).map(([k, v]) => [k, { ...TPL[k], ...(v.subject ? { subject: v.subject } : {}), ...(v.body ? { body: v.body } : {}) }])) });
+function msgCtx(cust, o, st) {
+  const store = st.storeName || 'LEVIT', first = String(cust.name || '').trim().split(/\s+/)[0] || 'there';
+  const coupon = (st.coupons || []).find((c) => c.active), off = st.offer?.active ? { code: st.offer.code, d: `${st.offer.pct}% off` } : null;
+  const best = coupon ? { code: coupon.code, d: (coupon.type === 'pct' ? `${coupon.value}% off` : `${inr(coupon.value)} off`) + (coupon.min ? ` orders over ${inr(coupon.min)}` : '') } : off || { code: '', d: '' };
+  const ctx = { name: first, fullname: cust.name || '', store, phone: cust.phone || '', orders: cust.orders ?? '', spent: cust.spent != null ? inr(cust.spent) : '', code: best.code, codeoff: best.d };
+  if (o) {
+    const trk = o.tracking?.number;
+    Object.assign(ctx, {
+      order: o.id, total: inr(o.total), subtotal: inr(o.subtotal), status: o.status,
+      items: o.lines.map((l) => `• ${l.name} (size ${l.size}) × ${l.qty}: ${inr(l.price * l.qty)}`).join('\n'),
+      address: `${o.address.address}, ${o.address.city} ${o.address.pin}`,
+      payment: o.pay === 'cod' ? `Cash on delivery (please keep ${inr(o.total)} ready)` : o.paid ? 'Paid. Thank you!' : `${PAY[o.pay] || o.pay}`,
+      trackline: trk ? `Courier: ${o.tracking.courier || 'see below'}\nTracking number: ${trk}` : 'We will share the tracking details shortly.',
+    });
+  } else Object.assign(ctx, { order: '', total: '', items: '', address: '', payment: '', trackline: '' });
+  return ctx;
+}
+const fillTpl = (t, ctx) => String(t || '').replace(/\{(\w+)\}/g, (m, k) => (k in ctx ? ctx[k] : m)).replace(/\n{3,}/g, '\n\n').trim();
+const waUrl = (phone, text) => waLink(phone, text);
+
+async function openComposer(cust, o, channel = 'wa', back) {
+  if (!settingsCache) { try { settingsCache = (await api('settings')).settings; } catch (e) { if (e.status === 401) throw e; settingsCache = { templates: {} }; } }
+  const st = settingsCache, T = tplFor(st), ctx = msgCtx(cust, o, st);
+  const orderKeys = ['confirm', 'packed', 'shipped', 'delivered', 'cancelled', 'payment', 'review'], custKeys = ['thanks', 'winback', 'offer'];
+  const keys = o ? [...orderKeys, ...custKeys] : custKeys;
+  let key = o ? ({ new: 'confirm', packed: 'packed', shipped: 'shipped', delivered: 'delivered', cancelled: 'cancelled' }[o.status] || 'confirm') : 'thanks';
+  let ch = channel === 'mail' ? 'mail' : 'wa';
+  const body = `<div class="field"><span>Send by</span><div class="seg" id="mch"><button type="button" data-c="wa" aria-pressed="${ch === 'wa'}">WhatsApp</button><button type="button" data-c="mail" aria-pressed="${ch === 'mail'}">Email</button></div></div>
+    <label class="field"><span>Message type</span><select id="mtpl">${keys.map((k) => `<option value="${k}" ${k === key ? 'selected' : ''}>${esc(T[k].label)}</option>`).join('')}</select></label>
+    <label class="field"><span id="mtol">To</span><input id="mto" ${'readonly'} aria-label="Recipient"></label>
+    <label class="field" id="msubf"><span>Subject</span><input id="msub" maxlength="150"></label>
+    <label class="field"><span>Message</span><textarea id="mbody" rows="13" style="min-height:260px"></textarea><small>Everything is filled in from ${o ? `order ${esc(o.id)} and ` : ''}the customer's details. Edit it freely before you send.</small></label>
+    <p class="hint" id="mwarn" hidden></p>`;
+  openPanel(`Message ${String(cust.name || 'customer').trim().split(' ')[0]}`, body, `${back ? '<button class="btn" id="mback" type="button" style="flex:0 0 auto">Back</button>' : ''}<button class="btn" id="mcopy" type="button">Copy</button><button class="btn btn--ink" id="msend" type="button"></button>`);
+  const fill = () => {
+    const t = T[key];
+    $('#msub').value = fillTpl(t.subject, ctx); $('#mbody').value = fillTpl(t.body, ctx);
+  };
+  const showCh = () => {
+    $$('#mch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.c === ch)));
+    $('#msubf').hidden = ch !== 'mail';
+    $('#mtol').textContent = ch === 'mail' ? 'To (email)' : 'To (WhatsApp number)'; $('#mto').value = ch === 'mail' ? cust.email || '' : cust.phone || '';
+    $('#msend').textContent = ch === 'mail' ? 'Open email' : 'Open WhatsApp';
+    const missing = ch === 'mail' ? !cust.email : !cust.phone; const w = $('#mwarn'); w.hidden = !missing; w.textContent = missing ? `This customer has no ${ch === 'mail' ? 'email address' : 'phone number'} on file.` : '';
+  };
+  fill(); showCh();
+  $('#mch').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { ch = b.dataset.c; showCh(); } });
+  $('#mtpl').addEventListener('change', (e) => { key = e.target.value; fill(); });
+  $('#mback')?.addEventListener('click', back);
+  $('#mcopy').addEventListener('click', () => copyText(ch === 'mail' ? `Subject: ${$('#msub').value}\n\n${$('#mbody').value}` : $('#mbody').value, 'Message'));
+  $('#msend').addEventListener('click', () => {
+    const text = $('#mbody').value.trim(); if (!text) return toast('Write a message first', { err: true });
+    if (ch === 'mail') {
+      if (!cust.email) return toast('No email address for this customer', { err: true });
+      const url = `mailto:${encodeURIComponent(cust.email).replace(/%40/g, '@')}?subject=${encodeURIComponent($('#msub').value)}&body=${encodeURIComponent(text).replace(/%0A/g, '%0D%0A')}`;
+      if (url.length > 2000) toast('Long email: if it is cut off in your mail app, use Copy instead.');
+      const a = document.createElement('a'); a.href = url; a.click();
+    } else {
+      if (!cust.phone) return toast('No phone number for this customer', { err: true });
+      window.open(waUrl(cust.phone, text), '_blank', 'noopener');
+    }
+  });
+}
+async function composeForCustomer(c, ch, back) {
+  const { orders: all } = await api('orders'); ordersCache = all;
+  const mine = all.filter((o) => (o.customer.email || o.customer.phone).toLowerCase() === c.key);
+  return openComposer({ name: c.name, email: c.email, phone: c.phone, orders: c.orders, spent: c.spent }, mine[0] || null, ch, back);
 }
 
 /* ---------- products ---------- */
@@ -805,12 +890,12 @@ async function viewCustomers() {
     const rows = list(); $('#ccount').textContent = `${rows.length} of ${customers.length} customer${customers.length === 1 ? '' : 's'}`;
     $('#clist').innerHTML = rows.length ? rows.map((c) => `<div class="row row--cust" data-key="${esc(c.key)}" tabindex="0" role="button"><div class="meta"><b>${esc(c.name)}</b> ${c.orders > 1 ? '<span class="pill s-delivered">repeat</span>' : ''} ${c.spent >= VIP_AT || c.orders >= 3 ? '<span class="pill s-packed">VIP</span>' : ''} ${c.tags.map((t) => `<span class="pill s-draft">${esc(t)}</span>`).join(' ')}
       <span class="sub">${esc(c.city)} · ${c.orders} order${c.orders === 1 ? '' : 's'} · <b style="font-weight:600;color:var(--ink)">${inr(c.spent)}</b> · last order ${ago(c.last)}</span><span class="sub">${esc(c.phone)} · ${esc(c.email)}</span>${c.note ? `<span class="sub">Note: ${esc(c.note.slice(0, 70))}${c.note.length > 70 ? '…' : ''}</span>` : ''}</div>
-      <div class="cacts"><a class="icon" href="${waLink(c.phone, `Hi ${c.name.split(' ')[0]}, thank you for shopping with LEVIT!`)}" target="_blank" rel="noopener" aria-label="WhatsApp ${esc(c.name)}">${ICON.wa}</a><a class="icon" href="tel:${esc(c.phone)}" aria-label="Call ${esc(c.name)}">${ICON.phone}</a><a class="icon" href="mailto:${esc(c.email)}" aria-label="Email ${esc(c.name)}">${ICON.mail}</a></div></div>`).join('')
+      <div class="cacts"><button class="icon" type="button" data-cmp="wa" data-k="${esc(c.key)}" aria-label="Message ${esc(c.name)} on WhatsApp">${ICON.wa}</button><a class="icon" href="tel:${esc(c.phone)}" aria-label="Call ${esc(c.name)}">${ICON.phone}</a><button class="icon" type="button" data-cmp="mail" data-k="${esc(c.key)}" aria-label="Email ${esc(c.name)}">${ICON.mail}</button></div></div>`).join('')
       : `<p class="empty">${customers.length ? 'No customers match these filters.' : 'Customers appear after their first order.'}</p>`;
     $$('#csegs .chip').forEach((b) => b.addEventListener('click', () => { f.seg = b.dataset.s; paint(); }));
     $('#cmore .dot').hidden = !moreOn();
   };
-  $('#clist').addEventListener('click', (e) => { if (e.target.closest('.cacts')) return; const r = e.target.closest('[data-key]'); if (r) openCustomer(customers.find((c) => c.key === r.dataset.key), paint); });
+  $('#clist').addEventListener('click', guard(async (e) => { const cm = e.target.closest('[data-cmp]'); if (cm) { e.stopPropagation(); await composeForCustomer(customers.find((c) => c.key === cm.dataset.k), cm.dataset.cmp); return; } if (e.target.closest('.cacts')) return; const r = e.target.closest('[data-key]'); if (r) openCustomer(customers.find((c) => c.key === r.dataset.key), paint); }));
   $('#clist').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('[data-key]')) e.target.click(); });
   $('#cq').addEventListener('input', (e) => { f.q = e.target.value; paint(); });
   $('#csort').addEventListener('change', (e) => { f.sort = e.target.value; paint(); });
@@ -834,7 +919,7 @@ async function openCustomer(c, onSaved) {
   let tags = [...c.tags];
   const SUGG = ['VIP', 'Wholesale', 'Influencer', 'Friend', 'Do not call'];
   const body = `
-    <div class="quick noprint"><a href="${waLink(c.phone, `Hi ${c.name.split(' ')[0]}, thank you for shopping with LEVIT!`)}" target="_blank" rel="noopener">${ICON.wa}WhatsApp</a><a href="tel:${esc(c.phone)}">${ICON.phone}Call</a><a href="mailto:${esc(c.email)}">${ICON.mail}Email</a></div>
+    <div class="quick noprint"><button type="button" data-cmp="wa">${ICON.wa}WhatsApp</button><a href="tel:${esc(c.phone)}">${ICON.phone}Call</a><button type="button" data-cmp="mail">${ICON.mail}Email</button></div>
     <section class="sec"><h3>Summary</h3><dl class="kv"><dt>Phone</dt><dd>${esc(c.phone)}</dd><dt>Email</dt><dd>${esc(c.email)}</dd><dt>City</dt><dd>${esc(c.city)}</dd><dt>Customer since</dt><dd>${when(c.first, true)}</dd><dt>Last order</dt><dd>${ago(c.last)}</dd><dt>Orders</dt><dd class="num">${c.orders}${mine.length !== live.length ? ` (${mine.length - live.length} cancelled)` : ''}</dd><dt>Total spent</dt><dd class="num"><b>${inr(c.spent)}</b></dd><dt>Average order</dt><dd class="num">${inr(live.length ? c.spent / live.length : 0)}</dd>${payTop ? `<dt>Usually pays by</dt><dd>${PAY[payTop[0]] || payTop[0]}</dd>` : ''}</dl></section>
     ${favList.length ? `<section class="sec"><h3>Favourite pieces</h3><ul class="list">${favList.map(([n, q]) => `<li><div class="grow"><b>${esc(n)}</b></div><span class="hint num">${q} bought</span></li>`).join('')}</ul></section>` : ''}
     <section class="sec"><h3>Tags</h3><div id="ctags" style="display:flex;gap:8px;flex-wrap:wrap"></div>
@@ -853,6 +938,7 @@ async function openCustomer(c, onSaved) {
     const rm = e.target.closest('[data-rmtag]'); if (rm) { tags.splice(+rm.dataset.rmtag, 1); drawTags(); return; }
     const ad = e.target.closest('[data-addtag]'); if (ad) { addTag(ad.dataset.addtag); return; }
     if (e.target.closest('#ctagadd')) { addTag($('#ctagin').value); $('#ctagin').value = ''; return; }
+    const cm = e.target.closest('[data-cmp]'); if (cm) { guard(() => composeForCustomer(c, cm.dataset.cmp, () => openCustomer(c, onSaved)))(); return; }
     const li = e.target.closest('[data-oid]'); if (li) { const o = ordersCache.find((x) => x.id === li.dataset.oid); if (o) openOrder(o); }
   };
   $('#ctagin').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addTag($('#ctagin').value); $('#ctagin').value = ''; } });
@@ -1002,6 +1088,13 @@ async function viewSettings() {
       </div></section>
       <div style="grid-column:1/-1"><button class="btn btn--ink btn--lg" type="submit" id="ssave">Save settings</button></div>
     </form>
+    <section class="card"><div class="card__h"><h2>Message templates</h2></div><div class="card__b" style="display:grid;gap:12px">
+      <p class="hint">The WhatsApp and email messages you send from an order or a customer start from these. Change the wording once and every message uses it.</p>
+      <label class="field"><span>Template</span><select id="tsel"></select></label>
+      <label class="field"><span>Email subject</span><input id="tsub" maxlength="150"></label>
+      <label class="field"><span>Message</span><textarea id="tbody" rows="10" maxlength="1600" style="min-height:220px"></textarea></label>
+      <p class="hint">Fill-in words you can use: <code>{name}</code> first name, <code>{fullname}</code>, <code>{order}</code>, <code>{total}</code>, <code>{items}</code>, <code>{address}</code>, <code>{payment}</code>, <code>{trackline}</code>, <code>{orders}</code>, <code>{spent}</code>, <code>{code}</code>, <code>{codeoff}</code>, <code>{store}</code>.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn--ink btn--sm" type="button" id="tsave">Save template</button><button class="btn btn--sm" type="button" id="treset">Back to the original</button></div></div></section>
     <div class="grid g2">
       <section class="card"><div class="card__h"><h2>Backup</h2></div><div class="card__b" style="display:grid;gap:12px"><p class="hint">Download everything (products, orders, settings, content) as one file. Do this before big changes.</p><div><button class="btn" type="button" id="bk">Download backup</button></div></div></section>
       <section class="card"><div class="card__h"><h2>This dashboard</h2></div><div class="card__b" style="display:grid;gap:8px">
@@ -1015,6 +1108,14 @@ async function viewSettings() {
     try { await saveSettingsPatch({ freeShip: f.freeShip.value, shipFee: f.shipFee.value, codFee: f.codFee.value, lowStock: f.lowStock.value, fromAddress: f.fromAddress.value, paused: f.paused.checked, pauseMessage: f.pauseMessage.value }); toast('Settings saved'); render(); }
     finally { btn.disabled = false; }
   }));
+  const tsel = $('#tsel'), loadT = () => { const t = tplFor()[tsel.value]; $('#tsub').value = t.subject; $('#tbody').value = t.body; };
+  tsel.innerHTML = Object.entries(TPL).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join(''); loadT(); tsel.addEventListener('change', loadT);
+  const saveT = guard(async (reset) => {
+    const k = tsel.value, next = { ...(settingsCache.templates || {}) };
+    if (reset || ($('#tsub').value === TPL[k].subject && $('#tbody').value === TPL[k].body)) delete next[k]; else next[k] = { subject: $('#tsub').value, body: $('#tbody').value };
+    await saveSettingsPatch({ templates: next }); loadT(); toast(reset ? 'Back to the original' : 'Template saved');
+  });
+  $('#tsave').addEventListener('click', () => saveT(false)); $('#treset').addEventListener('click', () => saveT(true));
   $('#bk').addEventListener('click', guard(async () => {
     const d = await api('backup'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 1)], { type: 'application/json' })); a.download = `levit-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); toast('Backup downloaded');
   }));
