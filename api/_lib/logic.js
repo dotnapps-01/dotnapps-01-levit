@@ -315,6 +315,23 @@ export async function updateOrder(id, input) {
   return { order: o };
 }
 
+/** Removes an order for good. Items go back into stock unless the order was already cancelled or delivered. */
+export async function deleteOrder(id) {
+  const o = await db.hget('levit:orders', id);
+  if (!o) return { notFound: true };
+  if (o.status !== 'cancelled' && o.status !== 'delivered') {
+    for (const l of o.lines) { const p = await db.hget('levit:products', l.id); if (p) { p.stock[l.size] = (p.stock[l.size] || 0) + l.qty; await db.hset('levit:products', p.id, p); } }
+  }
+  if (o.offer) {                                                                // give the code use back
+    const settings = await getSettings(), stats = await db.hgetall('levit:stats');
+    const field = o.offer === settings.offer.code ? 'offerRedeemed' : 'c:' + o.offer;
+    if ((Number(stats[field]) || 0) > 0) await db.hincr('levit:stats', field, -1);
+  }
+  await db.hdel('levit:orders', id);
+  await logAct(`Order ${id} deleted`);
+  return { ok: true };
+}
+
 /* ---------- customers + statistics ---------- */
 export function customersFrom(orders) {
   const map = new Map();

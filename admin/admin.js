@@ -335,11 +335,18 @@ async function viewOrders() {
       <button class="btn btn--sm" type="button" data-all>${n === current().length && n ? 'Clear' : 'Select all'}</button>
       ${['packed', 'shipped', 'delivered'].map((s) => `<button class="btn btn--sm btn--ok" type="button" data-bulk="${s}" ${n ? '' : 'disabled'}>${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}
       <button class="btn btn--sm" type="button" data-bulk="cancelled" ${n ? '' : 'disabled'}>Cancel</button>
+      <button class="btn btn--sm" type="button" data-bulk="delete" ${n ? '' : 'disabled'} style="border-color:#f0a59d;color:#ffb4ab">Delete</button>
       <button class="btn btn--sm" type="button" data-done>Done</button></span></div>`;
     $('[data-all]', bar).onclick = () => { const all = current(); if (n === all.length) ui.sel.clear(); else all.forEach((o) => ui.sel.add(o.id)); paint(); };
     $('[data-done]', bar).onclick = () => { ui.selecting = false; ui.sel.clear(); paint(); };
     $$('[data-bulk]', bar).forEach((b) => b.onclick = guard(async () => {
       const to = b.dataset.bulk, ids = [...ui.sel];
+      if (to === 'delete') {
+        if (!(await confirmBox({ title: `Delete ${ids.length} order${ids.length === 1 ? '' : 's'}?`, text: 'They are removed for good. Open orders put their items back in stock.', yes: 'Delete', danger: true }))) return;
+        b.disabled = true; let gone = 0;
+        for (const id of ids) { try { await api('orders/' + encodeURIComponent(id), { method: 'DELETE', body: {} }); gone++; } catch (e) { if (e.status === 401) throw e; } }
+        ordersCache = ordersCache.filter((o) => !ui.sel.has(o.id)); toast(`${gone} order${gone === 1 ? '' : 's'} deleted`); ui.selecting = false; ui.sel.clear(); refreshBadge(); paint(); return;
+      }
       if (to === 'cancelled' && !(await confirmBox({ title: `Cancel ${ids.length} order${ids.length === 1 ? '' : 's'}?`, text: 'The items go back into stock.', yes: 'Cancel orders', danger: true }))) return;
       b.disabled = true; let done = 0;
       for (const id of ids) { try { await patchOrder(id, { status: to }); done++; } catch (e) { if (e.status === 401) throw e; } }
@@ -386,7 +393,7 @@ function openOrder(o) {
       <div><button class="btn btn--sm" id="otsave" type="button">Save payment and tracking</button></div></section>
     <section class="sec noprint"><h3>Internal note</h3><textarea id="onote" placeholder="Anything the team should know" maxlength="500">${esc(o.note)}</textarea><div><button class="btn btn--sm" id="osave" type="button">Save note</button></div></section>
     <section class="sec"><h3>History</h3><ul class="timeline">${o.history.map((h) => `<li><span class="pill s-${h.status}">${h.status}</span><small>${when(h.at, true)}</small></li>`).join('')}</ul></section>`;
-  openPanel(`Order ${o.id}`, body, `<button class="btn" id="oprint" type="button">${ICON.print} Print slip</button>`);
+  openPanel(`Order ${o.id}`, body, `<button class="btn btn--danger" id="odel" type="button" style="margin-right:auto;flex:0 0 auto">Delete</button><button class="btn" id="oprint" type="button">${ICON.print} Print slip</button>`);
   const patch = guard(async (data, msg) => {
     const order = await patchOrder(o.id, data); toast(msg || 'Saved');
     if (data.status) { openOrder(order); if (route === 'orders') window.__repaintOrders?.(); else if (route === 'overview') render(); }
@@ -400,6 +407,12 @@ function openOrder(o) {
   $('#otsave').addEventListener('click', () => patch({ paid: $('#opaid').checked, tracking: { courier: $('#otc').value, number: $('#otn').value } }, 'Saved'));
   $('#osave').addEventListener('click', () => patch({ note: $('#onote').value }, 'Note saved'));
   $('#oprint').addEventListener('click', () => print());
+  $('#odel').addEventListener('click', guard(async () => {
+    const back = o.status !== 'cancelled' && o.status !== 'delivered';
+    if (!(await confirmBox({ title: `Delete order ${o.id}?`, text: `This removes the order for good${back ? ' and puts its items back in stock' : ''}. To keep a record, cancel it instead.`, yes: 'Delete order', danger: true }))) return;
+    await api('orders/' + encodeURIComponent(o.id), { method: 'DELETE', body: {} });
+    ordersCache = ordersCache.filter((x) => x.id !== o.id); toast(`${o.id} deleted`); refreshBadge(); closePanel(); render();
+  }));
 }
 
 /* ---------- products ---------- */

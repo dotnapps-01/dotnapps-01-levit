@@ -16,7 +16,7 @@ import { db, persistent, storage } from './_lib/db.js';
 import { checkPassword, sessionCookie, clearCookie, isAdmin, configured, usingDefaultPassword, throttled, noteFailure } from './_lib/auth.js';
 import {
   publicCatalog, createOrder, allOrders, updateOrder, allProducts, createProduct, updateProduct, deleteProduct, reorderProducts, setStock,
-  getSettings, saveSettings, overview, customersFrom, checkCoupon, activity, backup, logAct, getCategories, saveCategories, STATUSES, SIZES,
+  getSettings, saveSettings, deleteOrder, overview, customersFrom, checkCoupon, activity, backup, logAct, getCategories, saveCategories, STATUSES, SIZES,
 } from './_lib/logic.js';
 import { SCHEMA, GROUPS, getContent, saveContent } from './_lib/content.js';
 import { saveImage, getImage, listImages } from './_lib/images.js';
@@ -119,6 +119,7 @@ export default async function handler(req, res) {
 
     if (route === 'orders') {
       if (method === 'GET') return send(res, 200, { orders: await allOrders(), statuses: STATUSES });
+      if (method === 'DELETE' && parts[2]) { const r = await deleteOrder(parts[2]); return r.notFound ? send(res, 404, { error: 'Order not found' }) : send(res, 200, { ok: true }); }
       if (method === 'PATCH' && parts[2]) {
         const r = await updateOrder(parts[2], await readJson(req));
         if (r.notFound) return send(res, 404, { error: 'Order not found' });
