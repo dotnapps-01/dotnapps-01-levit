@@ -8,8 +8,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const URL_ = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+/* Vercel can prefix the integration's variables (e.g. STORAGE_REST_API_URL), so any *_REST_API_URL / *_REST_API_TOKEN pair is accepted */
+const envEnd = (re) => { const k = Object.keys(process.env).find((n) => re.test(n) && process.env[n]); return k ? process.env[k] : undefined; };
+const URL_ = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || envEnd(/_REST_API_URL$/);
+const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || envEnd(/_REST_API_TOKEN$/);
 const PG = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING || '';
 const useRedis = Boolean(URL_ && TOKEN), usePg = !useRedis && /^postgres(ql)?:\/\//.test(PG);
 export const persistent = useRedis || usePg;
