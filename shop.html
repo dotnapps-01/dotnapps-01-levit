@@ -39,12 +39,14 @@
 
 <div class="announce" role="region" aria-label="Offers">
   <div class="marquee" data-marquee>
-    <div class="marquee__track">
+    <div class="marquee__track" data-cms-list="announce">
       <span>Free shipping over ₹1,999</span><i>✦</i><span>7-day easy returns</span><i>✦</i><span>Cash on delivery available</span><i>✦</i><span>AW26 has landed</span><i>✦</i>
       <span aria-hidden="true">Free shipping over ₹1,999</span><i aria-hidden="true">✦</i><span aria-hidden="true">7-day easy returns</span><i aria-hidden="true">✦</i><span aria-hidden="true">Cash on delivery available</span><i aria-hidden="true">✦</i><span aria-hidden="true">AW26 has landed</span><i aria-hidden="true">✦</i>
     </div>
   </div>
 </div>
+
+<div class="paused" id="paused" role="status" hidden></div>
 
 <header class="head" id="head">
   <div class="head__l">
@@ -79,8 +81,8 @@
       <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span aria-hidden="true">/</span><span aria-current="page">Shop</span></nav>
       <header class="shop__head">
         <div>
-          <p class="eyebrow"><span class="eyebrow__dot"></span>The edit</p>
-          <h1 class="display" id="shop-title">Off the <em>rail</em></h1>
+          <p class="eyebrow"><span class="eyebrow__dot"></span><span data-cms="shop.eyebrow">The edit</span></p>
+          <h1 class="display" id="shop-title" data-cms="shop.title">Off the <em>rail</em></h1>
           <p class="shop__blurb" id="shop-blurb">Every piece photographed in our boutique. Tap one to see it up close.</p>
         </div>
         <p class="shop__count"><b id="shop-n">21</b> pieces</p>
@@ -112,8 +114,8 @@
   <section class="join" id="join" aria-labelledby="join-title">
     <div class="wrap join__grid">
       <div>
-        <h2 class="display display--light" id="join-title" data-reveal>Join the <em>list.</em></h2>
-        <p data-reveal>First look at new drops, quiet sales, and 10% off your first order.</p>
+        <h2 class="display display--light" id="join-title" data-reveal data-cms="join.title">Join the <em>list.</em></h2>
+        <p data-reveal data-cms="join.text">First look at new drops, quiet sales, and 10% off your first order.</p>
       </div>
       <form class="join__form" id="join-form" data-reveal novalidate>
         <label for="join-email" class="sr">Email address</label>
@@ -130,7 +132,8 @@
   <div class="wrap foot__grid">
     <div class="foot__brand">
       <a class="logo logo--foot" href="index.html">LEVIT</a>
-      <p>Womenswear made to feel light.</p>
+      <p data-cms="footer.tagline">Womenswear made to feel light.</p>
+      <p class="foot__contact" data-cms-group hidden><a data-cms-opt="contact.whatsapp" data-cms-href="wa" target="_blank" rel="noopener" hidden>WhatsApp</a><a data-cms-opt="contact.instagram" data-cms-href="url" target="_blank" rel="noopener" hidden>Instagram</a><a data-cms-opt="contact.email" data-cms-href="mail" hidden>Email</a></p>
     </div>
     <nav aria-label="Shop"><h3>Shop</h3>
       <a href="shop.html?cat=all" data-filter="all">All</a>
@@ -145,12 +148,12 @@
       <a href="index.html#boutique">Visit the boutique</a>
       <a href="index.html#join">Newsletter</a>
     </nav>
-    <div><h3>Payments</h3><p class="foot__pay">UPI · Cards · Net banking · Cash on delivery</p></div>
+    <div><h3>Payments</h3><p class="foot__pay" data-cms="footer.pay">UPI · Cards · Net banking · Cash on delivery</p></div>
   </div>
   <div class="foot__word" aria-hidden="true"><span>L</span><span>E</span><span>V</span><span>I</span><span>T</span></div>
   <div class="wrap foot__legal">
     <p>© <span id="yr">2026</span> LEVIT. All rights reserved.</p>
-    <p>Demo storefront — checkout is simulated and no payment is taken.</p>
+    <p data-cms="footer.legal">Demo storefront — checkout is simulated and no payment is taken.</p>
   </div>
 </footer>
 
@@ -170,10 +173,16 @@
       <a class="btn btn--ink" href="shop.html" data-close><span>Start shopping</span></a>
     </div>
     <footer class="drawer__foot" id="bag-foot">
+      <form class="promo" id="promo-form" novalidate>
+        <label class="sr" for="promo-in">Promo code</label>
+        <input id="promo-in" placeholder="Promo code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="16">
+        <button class="btn btn--ghost btn--sm" type="submit"><span>Apply</span></button>
+      </form>
+      <p class="promo__msg" id="promo-msg" role="status"></p>
       <dl class="totals">
         <div><dt>Subtotal</dt><dd id="sub">₹0</dd></div>
         <div><dt>Shipping</dt><dd id="shipcost">—</dd></div>
-        <div id="disc-row" hidden><dt>Offer <span id="disc-code"></span></dt><dd id="disc"></dd></div>
+        <div id="disc-row" hidden><dt>Offer <span id="disc-code"></span> <button class="link" type="button" id="promo-rm" aria-label="Remove promo code">Remove</button></dt><dd id="disc"></dd></div>
         <div class="totals__grand"><dt>Total</dt><dd id="grand">₹0</dd></div>
       </dl>
       <button class="btn btn--ink btn--block" id="checkout-btn"><span>Checkout</span></button>

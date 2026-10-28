@@ -616,5 +616,19 @@ input, select, textarea { font-size: max(16px, 1em); }
 @media (min-width: 760px) { .grid--four { grid-template-columns: repeat(2, 1fr); max-width: 760px; margin-inline: auto; } }
 @media (min-width: 1100px) { .grid--four { grid-template-columns: repeat(4, 1fr); max-width: none; } }
 
+/* CMS-driven bits: boutique details, footer contact, paused-orders bar, promo code box */
+.pull q { quotes: none; }
+.boutique__info { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 6px; font-size: .98rem; white-space: pre-line; }
+.boutique__info a { text-decoration: underline; text-underline-offset: 3px; }
+.foot__contact { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 12px !important; }
+.foot__contact a { text-decoration: underline; text-underline-offset: 3px; }
+.paused { background: #7a2e1f; color: #fff; text-align: center; padding: 10px 16px; font-size: .9rem; position: relative; z-index: 60; }
+.promo { display: flex; gap: 8px; }
+.promo input { flex: 1; min-width: 0; min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 99px; background: var(--cream); font-size: 16px; text-transform: uppercase; letter-spacing: .08em; }
+.promo input:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+.promo__msg { min-height: 1.1em; margin: -6px 0 0; font-size: .85rem; color: var(--rust); } .promo__msg.ok { color: #2f6b4b; }
+.btn--sm { min-height: 44px; padding-inline: 20px; }
+#promo-rm { font-size: .78rem; margin-left: 4px; }
+
 /* sections below the shop are only laid out and painted when they approach the screen */
 .dresses, .story, .craft, .boutique, .join, .foot { content-visibility: auto; contain-intrinsic-size: auto 760px; }

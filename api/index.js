@@ -7,14 +7,18 @@
  *            GET  /api/admin/overview            GET /api/admin/customers
  *            GET  /api/admin/orders              PATCH /api/admin/orders/:id
  *            GET/POST /api/admin/products        PUT/DELETE /api/admin/products/:id
- *            GET/PUT /api/admin/settings
+ *            GET/PUT /api/admin/settings         GET/PUT /api/admin/content (CMS)
+ *            POST /api/admin/stock               POST /api/admin/products/reorder
+ *            GET  /api/admin/activity            GET /api/admin/backup
+ *   public   GET  /api/coupon?code=&sub=         check a promo code
  */
 import { db, persistent, storage } from './_lib/db.js';
 import { checkPassword, sessionCookie, clearCookie, isAdmin, configured, usingDefaultPassword, throttled, noteFailure } from './_lib/auth.js';
 import {
-  publicCatalog, createOrder, allOrders, updateOrder, allProducts, createProduct, updateProduct, deleteProduct,
-  getSettings, saveSettings, overview, customersFrom, CATEGORIES, STATUSES, SIZES,
+  publicCatalog, createOrder, allOrders, updateOrder, allProducts, createProduct, updateProduct, deleteProduct, reorderProducts, setStock,
+  getSettings, saveSettings, overview, customersFrom, checkCoupon, activity, backup, logAct, CATEGORIES, STATUSES, SIZES,
 } from './_lib/logic.js';
+import { SCHEMA, GROUPS, getContent, saveContent } from './_lib/content.js';
 
 const send = (res, status, body, headers = {}) => {
   res.statusCode = status;
@@ -55,6 +59,10 @@ export default async function handler(req, res) {
       if (r.error) return send(res, r.status, { error: r.error });
       return send(res, 201, { ok: true, id: r.order.id, total: r.order.total });
     }
+    if (parts[0] === 'coupon' && method === 'GET') {
+      const r = await checkCoupon(url.searchParams.get('code'), url.searchParams.get('sub'));
+      return send(res, 200, r);
+    }
     if (parts[0] === 'offer-claim' && method === 'POST') {
       await db.hincr('levit:stats', 'offerClaimed', 1);
       return send(res, 200, { ok: true });
@@ -80,6 +88,17 @@ export default async function handler(req, res) {
     if (!isAdmin(req)) return send(res, 401, { error: 'Sign in required' });
     if (method !== 'GET' && !String(req.headers['content-type'] || '').includes('application/json')) return send(res, 415, { error: 'JSON only' });
 
+    if (route === 'pulse' && method === 'GET') {            // light poll for new-order alerts
+      const o = await allOrders();
+      return send(res, 200, { new: o.filter((x) => x.status === 'new').length, total: o.length, latest: o[0] ? { id: o[0].id, name: o[0].customer.name, total: o[0].total, at: o[0].createdAt } : null });
+    }
+    if (route === 'activity' && method === 'GET') return send(res, 200, { activity: await activity(60) });
+    if (route === 'backup' && method === 'GET') return send(res, 200, await backup(), { 'Content-Disposition': `attachment; filename="levit-backup-${new Date().toISOString().slice(0, 10)}.json"` });
+    if (route === 'content') {
+      if (method === 'GET') return send(res, 200, { schema: SCHEMA, groups: GROUPS, values: await getContent() });
+      if (method === 'PUT') { const values = await saveContent(await readJson(req)); await logAct('Edited site content'); return send(res, 200, { values }); }
+    }
+    if (route === 'stock' && method === 'POST') return send(res, 200, { updated: await setStock((await readJson(req)).updates) });
     if (route === 'overview' && method === 'GET') return send(res, 200, { ...(await overview(Number(url.searchParams.get('days')) || 14)), persistent });
     if (route === 'customers' && method === 'GET') return send(res, 200, { customers: customersFrom(await allOrders()) });
 
@@ -95,6 +114,7 @@ export default async function handler(req, res) {
 
     if (route === 'products') {
       if (method === 'GET') return send(res, 200, { products: await allProducts(), categories: CATEGORIES, sizes: SIZES });
+      if (method === 'POST' && parts[2] === 'reorder') { await reorderProducts((await readJson(req)).ids); return send(res, 200, { ok: true }); }
       if (method === 'POST') {
         const r = await createProduct(await readJson(req));
         if (r.errs) return send(res, 422, { error: r.errs.join('. ') });
@@ -111,7 +131,7 @@ export default async function handler(req, res) {
 
     if (route === 'settings') {
       if (method === 'GET') return send(res, 200, { settings: await getSettings(), persistent });
-      if (method === 'PUT') return send(res, 200, { settings: await saveSettings(await readJson(req)) });
+      if (method === 'PUT') { const settings = await saveSettings(await readJson(req)); await logAct('Changed settings'); return send(res, 200, { settings }); }
     }
 
     return send(res, 404, { error: 'Not found' });

@@ -40,12 +40,14 @@
 
 <div class="announce" role="region" aria-label="Offers">
   <div class="marquee" data-marquee>
-    <div class="marquee__track">
+    <div class="marquee__track" data-cms-list="announce">
       <span>Free shipping over ₹1,999</span><i>✦</i><span>7-day easy returns</span><i>✦</i><span>Cash on delivery available</span><i>✦</i><span>AW26 has landed</span><i>✦</i>
       <span aria-hidden="true">Free shipping over ₹1,999</span><i aria-hidden="true">✦</i><span aria-hidden="true">7-day easy returns</span><i aria-hidden="true">✦</i><span aria-hidden="true">Cash on delivery available</span><i aria-hidden="true">✦</i><span aria-hidden="true">AW26 has landed</span><i aria-hidden="true">✦</i>
     </div>
   </div>
 </div>
+
+<div class="paused" id="paused" role="status" hidden></div>
 
 <header class="head" id="head">
   <div class="head__l">
@@ -91,8 +93,8 @@
   <section class="sec collections" id="collections" aria-labelledby="col-title">
     <div class="wrap">
       <header class="sec__head" data-reveal>
-        <p class="eyebrow"><span class="eyebrow__dot"></span>Shop by category</p>
-        <h2 class="display" id="col-title">Five ways to<br><em>wear light.</em></h2>
+        <p class="eyebrow"><span class="eyebrow__dot"></span><span data-cms="collections.eyebrow">Shop by category</span></p>
+        <h2 class="display" id="col-title" data-cms="collections.title">Five ways to<br><em>wear light.</em></h2>
       </header>
       <ol class="index" id="index"></ol>
     </div>
@@ -104,8 +106,8 @@
     <div class="wrap">
       <header class="shop__head">
         <div data-reveal>
-          <p class="eyebrow"><span class="eyebrow__dot"></span>The edit</p>
-          <h2 class="display" id="shop-title">Off the <em>rail</em></h2>
+          <p class="eyebrow"><span class="eyebrow__dot"></span><span data-cms="shop.eyebrow">The edit</span></p>
+          <h2 class="display" id="shop-title" data-cms="shop.title">Off the <em>rail</em></h2>
         </div>
         <p class="shop__count" data-reveal><b id="shop-n">21</b> pieces, shot in our boutique</p>
       </header>
@@ -119,10 +121,10 @@
     <div class="wrap">
       <header class="shop__head">
         <div data-reveal>
-          <p class="eyebrow"><span class="eyebrow__dot"></span>The dress edit</p>
-          <h2 class="display" id="dress-title">Dressed for <em>the moment</em></h2>
+          <p class="eyebrow"><span class="eyebrow__dot"></span><span data-cms="dresses.eyebrow">The dress edit</span></p>
+          <h2 class="display" id="dress-title" data-cms="dresses.title">Dressed for <em>the moment</em></h2>
         </div>
-        <p class="shop__count" data-reveal>Ruffles, polka dots, capes and embroidery</p>
+        <p class="shop__count" data-reveal data-cms="dresses.sub">Ruffles, polka dots, capes and embroidery</p>
       </header>
       <div class="grid grid--four" id="dress-grid"></div>
       <p class="shop__all" data-reveal><a class="btn btn--ink" href="shop.html?cat=dresses"><span>See all dresses</span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></p>
@@ -137,11 +139,11 @@
         <figcaption><span>Noir Shimmer Dress</span><button class="link" data-quick="noir-shimmer-ruched-dress">Shop the look →</button></figcaption>
       </figure>
       <div class="story__copy">
-        <p class="eyebrow" data-reveal><span class="eyebrow__dot"></span>The idea</p>
-        <h2 class="display" id="story-title" data-reveal>Quietly bold.<br><em>Never loud.</em></h2>
-        <p class="lead" data-reveal>LEVIT began with a simple question: why does getting dressed feel so heavy? We make clothes that sit lightly — in the fabric, in the fit, and on your day.</p>
-        <p data-reveal>Texture over noise. Warm neutrals that go with everything you already own. Cuts that flatter without fussing. Every piece is designed in-house and tested on real women, in real light, on real stairs.</p>
-        <blockquote class="pull" data-reveal><span>“</span>Dress like you've nothing to prove, and everything to enjoy.</blockquote>
+        <p class="eyebrow" data-reveal><span class="eyebrow__dot"></span><span data-cms="story.eyebrow">The idea</span></p>
+        <h2 class="display" id="story-title" data-reveal data-cms="story.title">Quietly bold.<br><em>Never loud.</em></h2>
+        <p class="lead" data-reveal data-cms="story.lead">LEVIT began with a simple question: why does getting dressed feel so heavy? We make clothes that sit lightly — in the fabric, in the fit, and on your day.</p>
+        <p data-reveal data-cms="story.body">Texture over noise. Warm neutrals that go with everything you already own. Cuts that flatter without fussing. Every piece is designed in-house and tested on real women, in real light, on real stairs.</p>
+        <blockquote class="pull" data-reveal><span>“</span><q data-cms="story.quote">Dress like you've nothing to prove, and everything to enjoy.</q></blockquote>
         <div class="story__stats" data-reveal>
           <div><b data-count="21">0</b><span>pieces this season</span></div>
           <div><b data-count="5">0</b><span>sizes, XS–XL</span></div>
@@ -159,17 +161,17 @@
         <svg class="craft__ring" viewBox="0 0 200 200"><defs><path id="ring2" d="M100,100 m-84,0 a84,84 0 1,1 168,0 a84,84 0 1,1 -168,0"/></defs><text><textPath href="#ring2">RUFFLES · LACE · VOILE · CREPE · SOFT TO THE TOUCH · BUILT TO LAST ·</textPath></text></svg>
       </div>
       <div>
-        <p class="eyebrow eyebrow--light" data-reveal><span class="eyebrow__dot"></span>Made to be lived in</p>
-        <h2 class="display display--light" id="craft-title" data-reveal>Soft by nature.<br><em>Structured by design.</em></h2>
+        <p class="eyebrow eyebrow--light" data-reveal><span class="eyebrow__dot"></span><span data-cms="craft.eyebrow">Made to be lived in</span></p>
+        <h2 class="display display--light" id="craft-title" data-reveal data-cms="craft.title">Soft by nature.<br><em>Structured by design.</em></h2>
         <ul class="pillars">
-          <li data-reveal><span>01</span><div><h3>Feel</h3><p>Breathable viscose knits, cotton voile and crepe with real hand-feel. Nothing scratchy, nothing stiff.</p></div></li>
-          <li data-reveal><span>02</span><div><h3>Fit</h3><p>Cut for XS–XL with a little give where you need it. Not the right size? Swap it within 7 days.</p></div></li>
-          <li data-reveal><span>03</span><div><h3>Finish</h3><p>Elasticated hems that hold their shape, brass-tone hardware, and seams you'll never think about.</p></div></li>
+          <li data-reveal><span>01</span><div><h3 data-cms="craft.p1.title">Feel</h3><p data-cms="craft.p1.text">Breathable viscose knits, cotton voile and crepe with real hand-feel. Nothing scratchy, nothing stiff.</p></div></li>
+          <li data-reveal><span>02</span><div><h3 data-cms="craft.p2.title">Fit</h3><p data-cms="craft.p2.text">Cut for XS–XL with a little give where you need it. Not the right size? Swap it within 7 days.</p></div></li>
+          <li data-reveal><span>03</span><div><h3 data-cms="craft.p3.title">Finish</h3><p data-cms="craft.p3.text">Elasticated hems that hold their shape, brass-tone hardware, and seams you'll never think about.</p></div></li>
         </ul>
         <ul class="perks" data-reveal>
-          <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/></svg>Free shipping over ₹1,999</li>
-          <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/></svg>7-day easy exchange</li>
-          <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.4"/></svg>Cash on delivery</li>
+          <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/></svg><span data-cms="perk.1">Free shipping over ₹1,999</span></li>
+          <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/></svg><span data-cms="perk.2">7-day easy exchange</span></li>
+          <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.4"/></svg><span data-cms="perk.3">Cash on delivery</span></li>
         </ul>
       </div>
     </div>
@@ -179,11 +181,16 @@
   <section class="sec boutique" id="boutique" aria-labelledby="boutique-title">
     <div class="wrap boutique__grid">
       <div class="boutique__copy">
-        <p class="eyebrow" data-reveal><span class="eyebrow__dot"></span>In person</p>
-        <h2 class="display" id="boutique-title" data-reveal>Come say<br><em>hello.</em></h2>
-        <p class="lead" data-reveal>Our boutique is the quietest way to meet the collection: racks you can touch, fabrics you can feel, and a stylist who won't hover.</p>
+        <p class="eyebrow" data-reveal><span class="eyebrow__dot"></span><span data-cms="boutique.eyebrow">In person</span></p>
+        <h2 class="display" id="boutique-title" data-reveal data-cms="boutique.title">Come say<br><em>hello.</em></h2>
+        <p class="lead" data-reveal data-cms="boutique.lead">Our boutique is the quietest way to meet the collection: racks you can touch, fabrics you can feel, and a stylist who won't hover.</p>
+        <ul class="boutique__info" data-reveal data-cms-group hidden>
+          <li data-cms-opt="boutique.address" data-cms-fill hidden></li>
+          <li data-cms-opt="boutique.hours" data-cms-fill hidden></li>
+          <li data-cms-opt="boutique.phone" hidden><a data-cms-href="tel" data-cms-fill></a></li>
+        </ul>
         <div class="boutique__cta" data-reveal>
-          <a class="btn btn--ink" href="#join" data-magnet><span>Book a styling visit</span></a>
+          <a class="btn btn--ink" href="#join" data-magnet><span data-cms="boutique.cta">Book a styling visit</span></a>
           <a class="btn btn--ghost" href="shop.html" data-magnet><span>Keep browsing</span></a>
         </div>
       </div>
@@ -197,8 +204,8 @@
   <section class="join" id="join" aria-labelledby="join-title">
     <div class="wrap join__grid">
       <div>
-        <h2 class="display display--light" id="join-title" data-reveal>Join the <em>list.</em></h2>
-        <p data-reveal>First look at new drops, quiet sales, and 10% off your first order.</p>
+        <h2 class="display display--light" id="join-title" data-reveal data-cms="join.title">Join the <em>list.</em></h2>
+        <p data-reveal data-cms="join.text">First look at new drops, quiet sales, and 10% off your first order.</p>
       </div>
       <form class="join__form" id="join-form" data-reveal novalidate>
         <label for="join-email" class="sr">Email address</label>
@@ -214,7 +221,8 @@
   <div class="wrap foot__grid">
     <div class="foot__brand">
       <a class="logo logo--foot" href="#top">LEVIT</a>
-      <p>Womenswear made to feel light.</p>
+      <p data-cms="footer.tagline">Womenswear made to feel light.</p>
+      <p class="foot__contact" data-cms-group hidden><a data-cms-opt="contact.whatsapp" data-cms-href="wa" target="_blank" rel="noopener" hidden>WhatsApp</a><a data-cms-opt="contact.instagram" data-cms-href="url" target="_blank" rel="noopener" hidden>Instagram</a><a data-cms-opt="contact.email" data-cms-href="mail" hidden>Email</a></p>
     </div>
     <nav aria-label="Shop"><h3>Shop</h3>
       <a href="shop.html?cat=all" data-filter="all">All</a>
@@ -229,12 +237,12 @@
       <a href="#boutique">Visit the boutique</a>
       <a href="#join">Newsletter</a>
     </nav>
-    <div><h3>Payments</h3><p class="foot__pay">UPI · Cards · Net banking · Cash on delivery</p></div>
+    <div><h3>Payments</h3><p class="foot__pay" data-cms="footer.pay">UPI · Cards · Net banking · Cash on delivery</p></div>
   </div>
   <div class="foot__word" aria-hidden="true"><span>L</span><span>E</span><span>V</span><span>I</span><span>T</span></div>
   <div class="wrap foot__legal">
     <p>© <span id="yr">2026</span> LEVIT. All rights reserved.</p>
-    <p>Demo storefront — checkout is simulated and no payment is taken.</p>
+    <p data-cms="footer.legal">Demo storefront — checkout is simulated and no payment is taken.</p>
   </div>
 </footer>
 
@@ -254,10 +262,16 @@
       <a class="btn btn--ink" href="shop.html" data-close><span>Start shopping</span></a>
     </div>
     <footer class="drawer__foot" id="bag-foot">
+      <form class="promo" id="promo-form" novalidate>
+        <label class="sr" for="promo-in">Promo code</label>
+        <input id="promo-in" placeholder="Promo code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="16">
+        <button class="btn btn--ghost btn--sm" type="submit"><span>Apply</span></button>
+      </form>
+      <p class="promo__msg" id="promo-msg" role="status"></p>
       <dl class="totals">
         <div><dt>Subtotal</dt><dd id="sub">₹0</dd></div>
         <div><dt>Shipping</dt><dd id="shipcost">—</dd></div>
-        <div id="disc-row" hidden><dt>Offer <span id="disc-code"></span></dt><dd id="disc"></dd></div>
+        <div id="disc-row" hidden><dt>Offer <span id="disc-code"></span> <button class="link" type="button" id="promo-rm" aria-label="Remove promo code">Remove</button></dt><dd id="disc"></dd></div>
         <div class="totals__grand"><dt>Total</dt><dd id="grand">₹0</dd></div>
       </dl>
       <button class="btn btn--ink btn--block" id="checkout-btn"><span>Checkout</span></button>

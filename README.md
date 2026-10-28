@@ -46,11 +46,17 @@ The storefront is static (no build step) and the `api/` folder is one Vercel ser
 ## Admin dashboard (`/admin`)
 A private back office for orders, products, customers and offers. Sign in at `https://your-site/admin/`.
 
-- **Overview**: revenue, orders, average order, customers, a 14 day revenue chart, orders by status, best sellers, low stock and recent orders.
-- **Orders**: filter by status, search, open an order to move it through New → Packed → Shipped → Delivered (or cancel, which puts the items back in stock), add an internal note, print a packing slip, export CSV.
-- **Products**: add, edit, hide or delete pieces; price and compare-at price, label, description, per-size stock, colours, photo (pick an existing one or upload, resized in the browser). Sold-out sizes are struck through in the store and orders are refused when stock runs out.
-- **Customers**: grouped by email with order count and spend.
-- **Offers & settings**: the welcome-offer code, percentage, delay and on/off (with scratched / redeemed counts), free-shipping threshold, shipping fee and COD fee.
+- **Overview**: pick 7, 14, 30 or 90 days. Revenue, orders, average order and new customers with the change against the previous period, a "needs attention" strip (orders to pack, unpaid, low stock, paused store), revenue chart, orders by status, sales by category, payment methods, best sellers, low stock, top customers and recent orders.
+- **Orders**: status tabs, search, payment filter, one-tap "Mark packed / shipped / delivered" on each order, **bulk select** to update many at once, an order sheet with payment-received toggle, courier and tracking number, internal note, WhatsApp / call / email buttons (WhatsApp message is pre-written for the order's stage), print slip and CSV export. Cancelling puts the items back in stock.
+- **Products**: add, edit, duplicate, hide (switch on each row), delete and **reorder** pieces; price, compare-at price, label, description, colours, per-size stock and photo (pick an existing one or upload, resized in the browser).
+- **Inventory**: every piece and size in one screen with editable numbers, a "low or sold out only" filter and one Save.
+- **Customers**: grouped by email with order count, spend, repeat badge, WhatsApp / call / email and CSV export.
+- **Offers & coupons**: the welcome scratch-card offer (code, percent, delay, on/off, scratched and used counts) plus unlimited **coupon codes** (percent or fixed amount, minimum order, usage limit, expiry, on/off). Customers type coupons in the bag.
+- **Content (CMS)**: edit the words on the store without code: announcement bar, hero headlines for each look, section titles, story, "made to be lived in" block, boutique address / hours / phone, newsletter text, footer lines and contact links (WhatsApp, Instagram, email). Every field shows its original text and has a Reset. `*word*` makes a word italic and a new line is a line break. Defaults live in `api/_lib/content.js`; the storefront reads `data-cms` attributes.
+- **Settings**: shipping fee, free-shipping threshold, COD fee, low-stock alert level, **pause orders** (shows a bar on the store and blocks checkout), JSON **backup** download.
+- **Activity**: a log of new orders and every change made in the dashboard.
+- **Alerts**: while the dashboard is open it checks for new orders every 40 seconds, shows a badge, plays a short sound and offers a View button.
+- **On a phone**: bottom tab bar, bottom sheets you can swipe down to close, big tap targets, full-width action buttons, and it can be added to the home screen like an app.
 
 Prices, stock, offer discount, shipping and COD fee are always recalculated on the server, so the browser can not set its own price.
 

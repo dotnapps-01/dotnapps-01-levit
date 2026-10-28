@@ -277,7 +277,7 @@ function addToBag(id, size, ci, qty = 1, { open = true } = {}) {
 const lineTotal = (l) => byId(l.id).price * l.qty;
 const subtotal = () => bag.reduce((n, l) => n + lineTotal(l), 0);
 const shipping = (sub) => (sub === 0 || sub >= FREE_SHIP ? 0 : SHIP);
-const discount = (sub) => (offer ? Math.round((sub * offer.pct) / 100) : 0);
+const discount = (sub) => { if (!offer || (offer.min && sub < offer.min)) return 0; return offer.flat ? Math.min(offer.flat, sub) : Math.round((sub * (offer.pct || 0)) / 100); };
 
 function updateCounts() {
   const n = bag.reduce((a, l) => a + l.qty, 0);
@@ -568,13 +568,34 @@ const catalogFetch = () => {
   const req = early || fetch('/api/catalog').then((r) => (r.ok && (r.headers.get('content-type') || '').includes('json') ? r.json() : null));
   return Promise.race([req.catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
 };
+/* editable copy from the dashboard (CMS): *word* is italic, a new line is a line break */
+const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const fmt = (v) => esc(v).replace(/\*([^*\n]+)\*/g, '<em>$1</em>').replace(/\n/g, '<br>');
+const hrefFor = (kind, v) => (kind === 'wa' ? `https://wa.me/${v.replace(/\D/g, '')}` : kind === 'tel' ? `tel:${v.replace(/[^\d+]/g, '')}` : kind === 'mail' ? `mailto:${v}` : v);
+function applyContent(c) {
+  $$('[data-cms]').forEach((el) => { const v = c[el.dataset.cms]; if (v) el.innerHTML = fmt(v); });
+  $$('[data-cms-list]').forEach((el) => {
+    const v = c[el.dataset.cmsList]; if (!v) return;
+    const once = (hid) => v.split('\n').map((t) => `<span${hid ? ' aria-hidden="true"' : ''}>${esc(t)}</span><i${hid ? ' aria-hidden="true"' : ''}>✦</i>`).join('');
+    el.innerHTML = once(false) + once(true);
+  });
+  $$('[data-cms-opt]').forEach((el) => {
+    const v = c[el.dataset.cmsOpt]; el.hidden = !v; if (!v) return;
+    if (el.dataset.cmsHref) el.href = hrefFor(el.dataset.cmsHref, v);
+    if ('cmsFill' in el.dataset) el.textContent = v;
+  });
+  $$('[data-cms-fill]:not([data-cms-opt])').forEach((el) => { const li = el.closest('[data-cms-opt]'); const v = li && c[li.dataset.cmsOpt]; if (v) { el.textContent = v; el.href = hrefFor(el.dataset.cmsHref, v); } });
+  $$('[data-cms-group]').forEach((g) => { g.hidden = !$$('[data-cms-opt]', g).some((x) => !x.hidden); });
+}
 function applyCatalog(d) {
   if (!d || !Array.isArray(d.products) || !d.products.length) return false;
   PRODUCTS.splice(0, PRODUCTS.length, ...d.products.map((p) => ({ ...p, real: true })));
   CATEGORIES.splice(0, CATEGORIES.length, ...d.categories);
   const c = d.settings; FREE_SHIP = c.freeShip; SHIP = c.shipFee; COD = c.codFee; cfg = c; live = true;
   bag = bag.filter((l) => byId(l.id)); wish = new Set([...wish].filter(byId));
-  if (offer) { offer = c.offer.active ? { code: c.offer.code, pct: c.offer.pct } : null; store.set('levit.offer', offer); }
+  window.__levitContent = d.content || {}; applyContent(window.__levitContent);
+  const pz = $('#paused'); if (pz) { pz.hidden = !c.paused; pz.textContent = c.paused ? c.pauseMessage : ''; }
+  const cb = $('#checkout-btn'); if (cb) cb.disabled = !!c.paused;
   const cod = $('input[name="pay"][value="cod"] + span small'); if (cod) cod.textContent = `+ ₹${COD} handling`;
   const cd = $('#co-cod-row dd'); if (cd) cd.textContent = '₹' + COD;
   const note = $('.checkout__note'); if (note) note.textContent = 'No payment is taken online yet. We confirm your order by phone or email.';
@@ -582,6 +603,28 @@ function applyCatalog(d) {
   return true;
 }
 const syncCatalog = async () => applyCatalog(await catalogFetch());
+/* promo codes */
+$('#promo-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = $('#promo-in').value.trim(), msg = $('#promo-msg');
+  if (!code) { msg.className = 'promo__msg'; msg.textContent = 'Enter a code'; return; }
+  if (!live) { msg.className = 'promo__msg'; msg.textContent = 'Promo codes work once the store is connected.'; return; }
+  msg.className = 'promo__msg'; msg.textContent = 'Checking…';
+  try {
+    const r = await (await fetch(`/api/coupon?code=${encodeURIComponent(code)}&sub=${subtotal()}`)).json();
+    if (!r.ok) { msg.textContent = r.error || 'That code is not valid.'; return; }
+    offer = { code: r.code, ...(r.flat ? { flat: r.flat } : { pct: r.pct }), min: r.min || 0 }; store.set('levit.offer', offer);
+    $('#promo-in').value = ''; msg.className = 'promo__msg ok'; msg.textContent = `${r.code} applied`; renderBag();
+  } catch { msg.textContent = 'Connection problem. Try again.'; }
+});
+$('#promo-rm')?.addEventListener('click', () => { offer = null; store.set('levit.offer', null); $('#promo-msg').textContent = ''; renderBag(); });
+async function revalidateOffer() {                         // a saved code the dashboard has since changed or ended is dropped
+  if (!offer || !live) return;
+  try {
+    const r = await (await fetch(`/api/coupon?code=${encodeURIComponent(offer.code)}&sub=${Math.max(subtotal(), offer.min || 0)}`)).json();
+    if (!r.ok && !r.min) { const c = offer.code; offer = null; store.set('levit.offer', null); renderBag(); toast(`${c} is no longer valid`); }
+  } catch { /* offline: keep it */ }
+}
 function refreshShop() { renderIndex(); renderChips(); renderGrid(); renderDresses(); renderBag(); updateCounts(); }
 if (onShopPage) {
   const c = new URLSearchParams(location.search).get('cat');
@@ -591,8 +634,8 @@ if (onShopPage) {
 const catalogReq = catalogFetch();
 const quick = await Promise.race([catalogReq, new Promise((r) => setTimeout(() => r('late'), 300))]);
 if (quick !== 'late') applyCatalog(quick);
-refreshShop();
-if (quick === 'late') catalogReq.then((d) => { if (applyCatalog(d)) refreshShop(); });
+refreshShop(); revalidateOffer();
+if (quick === 'late') catalogReq.then((d) => { if (applyCatalog(d)) { refreshShop(); revalidateOffer(); } });
 $$('[data-reveal]').forEach(observeReveal);
 
 async function reveal() {
